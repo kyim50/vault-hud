@@ -7,6 +7,7 @@ import { DocumentsPanel } from '../components/DocumentsPanel'
 import { SchedulePanel } from '../components/SchedulePanel'
 import { PrimaryDirective } from '../components/PrimaryDirective'
 import { Clock } from '../components/Clock'
+import { PixelOrb } from '../components/PixelOrb'
 
 export default function App() {
   const snap = useSnapshot()
@@ -36,7 +37,7 @@ export default function App() {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
         <Panel title="Core" corner="ALIVE">
-          <div style={{ flex: 1 }} />
+          <PixelOrb usagePercent={snap.usage.percent} />
         </Panel>
         <PrimaryDirective {...snap.primary} />
       </div>
