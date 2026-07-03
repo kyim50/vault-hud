@@ -33,7 +33,11 @@ export class HudState extends EventEmitter {
   }
 
   async start(): Promise<void> {
-    await this.runner.load()
+    try {
+      await this.runner.load()
+    } catch (e) {
+      console.error('vault-hud: failed to load commands; continuing with empty command deck', e)
+    }
     // vault refresh after a command finishes writing notes
     this.runner.on('status', (s) => {
       if (s.state === 'done') void this.refreshVault()

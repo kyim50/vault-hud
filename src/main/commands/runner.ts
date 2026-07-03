@@ -5,6 +5,7 @@ import { basename, join } from 'node:path'
 import { execFile } from 'node:child_process'
 import type { CommandInfo, CommandStatus, VaultHudConfig } from '@shared/types'
 import { parseCommandFile, renderPrompt } from './commandFile'
+import { localDateStamp } from '../collectors/vaultNotes'
 
 export type SpawnFn = (
   prompt: string,
@@ -75,7 +76,7 @@ export class CommandRunner extends EventEmitter {
     return {
       vaultPath: this.config.vaultPath,
       dashboardFolder: this.config.dashboardFolder,
-      date: new Date().toISOString().slice(0, 10),
+      date: localDateStamp(new Date()),
       repos: this.config.repos.map((r) => `${r.name}: ${r.path}`).join('\n')
     }
   }

@@ -3,9 +3,13 @@ import type { HudState } from './state'
 
 export function setupTray(state: HudState, showHud: () => void): Tray {
   const tray = new Tray(nativeImage.createEmpty())
+  let lastFingerprint = ''
   const render = (): void => {
     tray.setTitle(`◉ ${state.snapshot.usage.percent}%`, { fontType: 'monospacedDigit' })
     const commands = state.snapshot.commands
+    const fingerprint = commands.map((c) => `${c.info.id}:${c.status.state}`).join()
+    if (fingerprint === lastFingerprint) return
+    lastFingerprint = fingerprint
     tray.setContextMenu(
       Menu.buildFromTemplate([
         { label: `Claude 5h window: ${state.snapshot.usage.percent}%`, enabled: false },

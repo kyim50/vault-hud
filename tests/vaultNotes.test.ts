@@ -3,7 +3,8 @@ import {
   parseDirectives,
   parseSchedule,
   toggleDirectiveLine,
-  planFileName
+  planFileName,
+  localDateStamp
 } from '../src/main/collectors/vaultNotes'
 
 const plan = ['# Plan', '', '- [ ] Ship the HUD shell', '- [x] Write the spec', 'notes', '- [ ] Call the bank'].join('\n')
@@ -44,5 +45,13 @@ describe('toggleDirectiveLine', () => {
 describe('planFileName', () => {
   it('formats YYYY-MM-DD Plan.md', () => {
     expect(planFileName(new Date(2026, 6, 3))).toBe('2026-07-03 Plan.md')
+  })
+})
+
+describe('localDateStamp', () => {
+  it('formats a local date as YYYY-MM-DD using local time, not UTC', () => {
+    // 23:30 local on July 3rd — in western timezones, .toISOString() would
+    // roll this to July 4th UTC. The regression this fix prevents.
+    expect(localDateStamp(new Date(2026, 6, 3, 23, 30))).toBe('2026-07-03')
   })
 })

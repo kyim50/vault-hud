@@ -29,9 +29,13 @@ export function toggleDirectiveLine(md: string, line: number, done: boolean): st
   return lines.join('\n')
 }
 
-export function planFileName(date: Date): string {
+export function localDateStamp(date: Date): string {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d} Plan.md`
+  return `${y}-${m}-${d}`
+}
+
+export function planFileName(date: Date): string {
+  return `${localDateStamp(date)} Plan.md`
 }

@@ -47,7 +47,9 @@ app.whenReady().then(async () => {
     try {
       await setDirectiveDone(config, d, done)
       await state.refreshVault()
-    } catch { /* fail soft */ }
+    } catch (e) {
+      console.error('vault-hud: toggleDirective failed', e)
+    }
   })
   ipcMain.on(IPC.openDoc, (_e, relPath: string) => {
     const vaultName = config.vaultPath.split('/').pop() ?? ''

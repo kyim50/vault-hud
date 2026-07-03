@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import type { Directive, ScheduleItem, VaultDoc, VaultHudConfig } from '@shared/types'
 import { parseDirectives, parseSchedule, planFileName, toggleDirectiveLine } from './vaultNotes'
 
@@ -75,7 +75,9 @@ export async function setDirectiveDone(
   d: Directive,
   done: boolean
 ): Promise<void> {
-  const full = join(config.vaultPath, d.file)
+  const vaultRoot = resolve(config.vaultPath)
+  const full = resolve(vaultRoot, d.file)
+  if (!full.startsWith(vaultRoot + sep)) return
   const md = await fs.readFile(full, 'utf8')
   await fs.writeFile(full, toggleDirectiveLine(md, d.line, done))
 }
