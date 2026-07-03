@@ -1,6 +1,7 @@
 import { useSnapshot } from '../lib/useSnapshot'
 import { Panel } from '../components/Panel'
 import { VitalsPanel } from '../components/VitalsPanel'
+import { CommandDeck } from '../components/CommandDeck'
 import { DirectivesPanel } from '../components/DirectivesPanel'
 import { DocumentsPanel } from '../components/DocumentsPanel'
 import { SchedulePanel } from '../components/SchedulePanel'
@@ -40,7 +41,7 @@ export default function App() {
         <PrimaryDirective {...snap.primary} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflowY: 'auto' }}>
-        <Panel title="Command Deck" corner={`${snap.commands.length} LOADED`}>deck…</Panel>
+        <CommandDeck commands={snap.commands} />
         <SchedulePanel schedule={snap.schedule} />
       </div>
     </div>
