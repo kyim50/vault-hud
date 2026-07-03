@@ -1,3 +1,7 @@
+import { useSnapshot } from '../lib/useSnapshot'
+
 export default function App() {
-  return <h1>V.A.U.L.T. boot ok</h1>
+  const snap = useSnapshot()
+  if (!snap) return <p>booting…</p>
+  return <pre style={{ fontSize: 10 }}>{JSON.stringify(snap, null, 2)}</pre>
 }

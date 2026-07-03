@@ -1,14 +1,17 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
+import { IPC } from '@shared/ipc'
+import type { Directive } from '@shared/types'
+import { loadOrCreateConfig } from './config'
+import { HudState } from './state'
+import { setDirectiveDone } from './collectors/vault'
+
+let state: HudState
 
 function createHudWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 1440,
-    height: 810,
-    minWidth: 1100,
-    minHeight: 640,
-    backgroundColor: '#0a0c08',
-    title: 'V.A.U.L.T.',
+    width: 1440, height: 810, minWidth: 1100, minHeight: 640,
+    backgroundColor: '#0a0c08', title: 'V.A.U.L.T.',
     webPreferences: { preload: join(__dirname, '../preload/index.mjs') }
   })
   if (process.env['ELECTRON_RENDERER_URL']) {
@@ -19,14 +22,44 @@ function createHudWindow(): BrowserWindow {
   return win
 }
 
-app.whenReady().then(() => {
+function broadcast(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send(IPC.snapshotUpdate, state.snapshot)
+  }
+}
+
+app.whenReady().then(async () => {
+  const { config } = await loadOrCreateConfig()
+  // In dev, commands/ lives at project root; in prod it's packaged alongside.
+  const commandsDir = app.isPackaged
+    ? join(process.resourcesPath, 'commands')
+    : join(app.getAppPath(), 'commands')
+  state = new HudState(config, commandsDir)
+  state.on('snapshot', broadcast)
+
+  ipcMain.handle(IPC.getSnapshot, () => state.snapshot)
+  ipcMain.on(IPC.runCommand, (_e, id: string) => state.runner.run(id))
+  ipcMain.on(IPC.toggleDirective, async (_e, d: Directive, done: boolean) => {
+    try {
+      await setDirectiveDone(config, d, done)
+      await state.refreshVault()
+    } catch { /* fail soft */ }
+  })
+  ipcMain.on(IPC.openDoc, (_e, relPath: string) => {
+    const vaultName = config.vaultPath.split('/').pop() ?? ''
+    void shell.openExternal(
+      `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(relPath.replace(/\.md$/, ''))}`
+    )
+  })
+
   createHudWindow()
+  void state.start()
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createHudWindow()
   })
 })
 
 app.on('window-all-closed', () => {
-  // keep alive for tray/notch later; quit for now
-  app.quit()
+  app.quit() // becomes no-quit in Task 11 when tray exists
 })
