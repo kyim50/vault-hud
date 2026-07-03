@@ -13,9 +13,18 @@ the Obsidian vault ("second brain", iCloud) as the source of truth for
 everything Claude generates.
 
 Visual direction: the V.A.U.L.T. HUD layout from the reference image,
-rendered in an **8-bit / pixel-art aesthetic** in the style of Anthropic's
-retro pixel illustrations — bitmap/pixel fonts, dithered shading, chunky
-pixel-grid borders, limited dark palette with a single green accent.
+with an **Anthropic-style 8-bit / pixel-art aesthetic captured faithfully**
+— the retro pixel illustration language Anthropic uses around Claude Code:
+dithered shading, chunky pixel-grid borders, bitmap/pixel display fonts,
+limited dark palette with a single accent, terminal texture everywhere
+(monospace body text, scanline restraint, prompt-style labels).
+
+Pixel art is the accent, not a blanket filter: illustrations, sprites,
+icons, sparklines, and display headings are pixel-rendered; dense data
+text stays crisp monospace for readability. Animations must be **smooth**
+— 60fps, GPU-friendly (transform/opacity), with deliberate easing; pixel
+sprites may step-animate by design, but panel transitions, counters, and
+hover states never jank.
 
 ## Surfaces (three windows)
 
