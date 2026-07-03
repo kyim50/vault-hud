@@ -1,5 +1,11 @@
 import { useSnapshot } from '../lib/useSnapshot'
 import { Panel } from '../components/Panel'
+import { VitalsPanel } from '../components/VitalsPanel'
+import { DirectivesPanel } from '../components/DirectivesPanel'
+import { DocumentsPanel } from '../components/DocumentsPanel'
+import { SchedulePanel } from '../components/SchedulePanel'
+import { PrimaryDirective } from '../components/PrimaryDirective'
+import { Clock } from '../components/Clock'
 
 export default function App() {
   const snap = useSnapshot()
@@ -20,21 +26,22 @@ export default function App() {
           <div style={{ fontFamily: 'var(--font-pixel)', fontSize: 14, color: 'var(--ink)' }}>{snap.appName}</div>
           <div className="dim" style={{ fontSize: 10 }}>VOICE-FREE UNIFIED LOGIC TERMINAL</div>
         </div>
-        <div style={{ fontFamily: 'var(--font-pixel)', fontSize: 16 }} className="accent" id="clock" />
+        <Clock />
       </header>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflowY: 'auto' }}>
-        <Panel title="System Vitals" corner="LIVE">vitals…</Panel>
-        <Panel title="Directives" corner="TOP 3">directives…</Panel>
-        <Panel title="Documents" corner="TRAIL">docs…</Panel>
+        <VitalsPanel repos={snap.repos} usage={snap.usage} />
+        <DirectivesPanel directives={snap.directives} />
+        <DocumentsPanel docs={snap.docs} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
         <Panel title="Core" corner="ALIVE">
-          <div style={{ flex: 1 }}>sprite…</div>
+          <div style={{ flex: 1 }} />
         </Panel>
+        <PrimaryDirective {...snap.primary} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflowY: 'auto' }}>
         <Panel title="Command Deck" corner={`${snap.commands.length} LOADED`}>deck…</Panel>
-        <Panel title="Schedule" corner="TODAY">schedule…</Panel>
+        <SchedulePanel schedule={snap.schedule} />
       </div>
     </div>
   )

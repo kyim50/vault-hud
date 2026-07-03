@@ -60,6 +60,8 @@ body {
 .dim { color: var(--ink-dim); }
 .accent { color: var(--accent); }
 
+[data-danger='true'] { color: var(--danger); }
+
 /* smooth interactions: transform/opacity only */
 button {
   font-family: var(--font-mono);
