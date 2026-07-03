@@ -24,7 +24,7 @@ function createHudWindow(): BrowserWindow {
 
 function broadcast(): void {
   for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send(IPC.snapshotUpdate, state.snapshot)
+    if (!win.isDestroyed()) win.webContents.send(IPC.snapshotUpdate, state.snapshot)
   }
 }
 
