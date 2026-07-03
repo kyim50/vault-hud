@@ -78,8 +78,12 @@ export async function loadOrCreateConfig(): Promise<{
       vaultPath,
       repoDirs: await detectRepoDirs(home)
     })
-    await fs.mkdir(CONFIG_DIR, { recursive: true })
-    await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2))
+    try {
+      await fs.mkdir(CONFIG_DIR, { recursive: true })
+      await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2))
+    } catch {
+      /* fail soft: boot with in-memory default even if persistence fails */
+    }
     return { config, created: true }
   }
 }
