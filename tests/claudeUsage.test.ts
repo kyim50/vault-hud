@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { parseJsonlUsage, computeWindowUsage } from '../src/main/collectors/claudeUsage'
+import { parseJsonlUsage, computeWindowUsage, collectClaudeUsage } from '../src/main/collectors/claudeUsage'
+import { buildDefaultConfig } from '../src/main/config'
 
 const line = (ts: string, input: number, output: number, cacheW = 0) =>
   JSON.stringify({
@@ -42,5 +43,16 @@ describe('computeWindowUsage', () => {
   it('caps percent at 100', () => {
     const usage = computeWindowUsage([{ ts: 10, tokens: 5000 }], 20, 100, 1000)
     expect(usage.percent).toBe(100)
+  })
+})
+
+describe('collectClaudeUsage fail-soft', () => {
+  it('resolves to a valid shape without throwing', async () => {
+    const config = buildDefaultConfig({ home: '/u', vaultPath: null, repoDirs: [] })
+    const usage = await collectClaudeUsage(config)
+    expect(usage.windowTokens).toBeGreaterThanOrEqual(0)
+    expect(usage.percent).toBeGreaterThanOrEqual(0)
+    expect(usage.percent).toBeLessThanOrEqual(100)
+    expect(usage.updatedAt).toBeGreaterThan(0)
   })
 })

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseCommitTimestamps, bucketDaily, countSince } from '../src/main/collectors/git'
+import { parseCommitTimestamps, bucketDaily, countSince, collectRepoStats } from '../src/main/collectors/git'
 
 describe('parseCommitTimestamps', () => {
   it('parses seconds lines into ms, skipping blanks', () => {
@@ -30,5 +30,16 @@ describe('bucketDaily', () => {
 describe('countSince', () => {
   it('counts timestamps at or after the boundary', () => {
     expect(countSince([100, 200, 300], 200)).toBe(2)
+  })
+})
+
+describe('collectRepoStats fail-soft', () => {
+  it('returns empty stats for a non-repo path without throwing', async () => {
+    const stats = await collectRepoStats({ name: 'ghost', path: '/tmp/definitely-not-a-repo-xyz' })
+    expect(stats).toEqual({
+      name: 'ghost', path: '/tmp/definitely-not-a-repo-xyz', branch: '—',
+      commitsToday: 0, commitsWeek: 0, dirtyFiles: 0,
+      lastCommit: '', daily: [0, 0, 0, 0, 0, 0, 0]
+    })
   })
 })
