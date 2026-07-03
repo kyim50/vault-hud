@@ -21,19 +21,23 @@ async function listDocs(config: VaultHudConfig): Promise<VaultDoc[]> {
       const full = join(dir, e.name)
       if (e.isDirectory()) await walk(full)
       else if (e.name.endsWith('.md')) {
-        const stat = await fs.stat(full)
-        const rel = relative(config.vaultPath, full)
-        docs.push({
-          title: e.name.replace(/\.md$/, ''),
-          relPath: rel,
-          folder: relative(root, dir) || '.',
-          mtime: stat.mtimeMs
-        })
+        try {
+          const stat = await fs.stat(full)
+          const rel = relative(config.vaultPath, full)
+          docs.push({
+            title: e.name.replace(/\.md$/, ''),
+            relPath: rel,
+            folder: relative(root, dir) || '.',
+            mtime: stat.mtimeMs
+          })
+        } catch {
+          continue
+        }
       }
     }
   }
   await walk(root)
-  return docs.sort((a, b) => b.mtime - a.mtime).slice(0, 12)
+  return docs.sort((a, b) => b.mtime - a.mtime)
 }
 
 export async function collectVaultData(config: VaultHudConfig): Promise<{
@@ -42,7 +46,8 @@ export async function collectVaultData(config: VaultHudConfig): Promise<{
   schedule: ScheduleItem[]
 }> {
   if (!config.vaultPath) return { docs: [], directives: [], schedule: [] }
-  const docs = await listDocs(config).catch(() => [] as VaultDoc[])
+  const allDocs = await listDocs(config).catch(() => [] as VaultDoc[])
+  const docs = allDocs.slice(0, 12)
 
   let directives: Directive[] = []
   const planRel = join(config.dashboardFolder, 'Plans', planFileName(new Date()))
@@ -54,7 +59,7 @@ export async function collectVaultData(config: VaultHudConfig): Promise<{
   }
 
   let schedule: ScheduleItem[] = []
-  const brief = docs.find((d) => d.folder === 'Briefs')
+  const brief = allDocs.find((d) => d.folder === 'Briefs')
   if (brief) {
     try {
       schedule = parseSchedule(await fs.readFile(join(config.vaultPath, brief.relPath), 'utf8'))
