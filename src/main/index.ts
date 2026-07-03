@@ -15,7 +15,8 @@ function createHudWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1440, height: 810, minWidth: 1100, minHeight: 640,
     backgroundColor: '#0a0c08', title: 'V.A.U.L.T.',
-    webPreferences: { preload: join(__dirname, '../preload/index.mjs') }
+    // sandbox off: electron-vite emits an ESM preload (.mjs), which sandboxed renderers can't load
+    webPreferences: { preload: join(__dirname, '../preload/index.mjs'), sandbox: false }
   })
   if (process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/hud.html`)

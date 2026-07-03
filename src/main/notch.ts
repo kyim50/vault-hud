@@ -19,7 +19,8 @@ export function createNotchWindow(): BrowserWindow {
     focusable: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    webPreferences: { preload: join(__dirname, '../preload/index.mjs') }
+    // sandbox off: ESM preload (.mjs) requires an unsandboxed renderer
+    webPreferences: { preload: join(__dirname, '../preload/index.mjs'), sandbox: false }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
