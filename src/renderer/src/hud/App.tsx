@@ -7,41 +7,43 @@ import { DocumentsPanel } from '../components/DocumentsPanel'
 import { SchedulePanel } from '../components/SchedulePanel'
 import { PrimaryDirective } from '../components/PrimaryDirective'
 import { Clock } from '../components/Clock'
-import { PixelOrb } from '../components/PixelOrb'
+import { Mascot } from '../components/Mascot'
 
 export default function App() {
   const snap = useSnapshot()
-  if (!snap) return <p style={{ padding: 20 }}>booting…</p>
+  if (!snap) return <p style={{ padding: 16 }}>booting…</p>
   return (
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '300px 1fr 320px',
-        gridTemplateRows: '48px 1fr',
-        gap: 10,
+        gridTemplateColumns: '280px 1fr 300px',
+        gridTemplateRows: '40px 1fr',
+        gap: 8,
         height: '100vh',
-        padding: 10
+        padding: 8
       }}
     >
-      <header style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <header style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px dotted var(--line-soft)', paddingBottom: 4 }}>
         <div>
-          <div style={{ fontFamily: 'var(--font-pixel)', fontSize: 14, color: 'var(--ink)' }}>{snap.appName}</div>
-          <div className="dim" style={{ fontSize: 10 }}>VOICE-FREE UNIFIED LOGIC TERMINAL</div>
+          <div style={{ fontFamily: 'var(--font-pixel)', fontSize: 12, color: 'var(--ink)' }}>{snap.appName}</div>
+          <div className="dim" style={{ fontSize: 9 }}>VOICE-FREE UNIFIED LOGIC TERMINAL</div>
         </div>
         <Clock />
       </header>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflowY: 'auto' }}>
         <VitalsPanel repos={snap.repos} usage={snap.usage} />
         <DirectivesPanel directives={snap.directives} />
         <DocumentsPanel docs={snap.docs} />
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
-        <Panel title="Core" corner="ALIVE">
-          <PixelOrb usagePercent={snap.usage.percent} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
+        <Panel title="Core" corner="ALIVE" style={{ flex: 1 }}>
+          <Mascot usagePercent={snap.usage.percent} />
+          <div style={{ borderTop: '1px dotted var(--line-soft)', paddingTop: 8 }}>
+            <PrimaryDirective {...snap.primary} />
+          </div>
         </Panel>
-        <PrimaryDirective {...snap.primary} />
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflowY: 'auto' }}>
         <CommandDeck commands={snap.commands} />
         <SchedulePanel schedule={snap.schedule} />
       </div>

@@ -13,7 +13,7 @@ export function DirectivesPanel({ directives }: { directives: Directive[] }) {
             type="checkbox"
             checked={d.done}
             onChange={(e) => window.vault.toggleDirective(d, e.target.checked)}
-            style={{ accentColor: 'var(--accent)' }}
+            style={{ accentColor: 'var(--ink)' }}
           />
           <span>{d.text}</span>
         </label>

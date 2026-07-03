@@ -13,8 +13,8 @@ let tray: Tray
 
 function createHudWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 1440, height: 810, minWidth: 1100, minHeight: 640,
-    backgroundColor: '#0a0c08', title: 'V.A.U.L.T.',
+    width: 1200, height: 720, minWidth: 1000, minHeight: 600,
+    backgroundColor: '#f4f2e9', title: 'V.A.U.L.T.',
     // sandbox off: electron-vite emits an ESM preload (.mjs), which sandboxed renderers can't load
     webPreferences: { preload: join(__dirname, '../preload/index.mjs'), sandbox: false }
   })
@@ -56,7 +56,7 @@ app.whenReady().then(async () => {
     )
   })
 
-  const hudWin = createHudWindow()
+  createHudWindow()
   const showHud = (): void => {
     const w = BrowserWindow.getAllWindows().find((x) => x.getTitle() === 'V.A.U.L.T.')
     if (w && !w.isDestroyed()) {
@@ -71,9 +71,8 @@ app.whenReady().then(async () => {
 
   void state.start()
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createHudWindow()
-  })
+  // the notch window never closes, so window-count checks are useless here
+  app.on('activate', showHud)
 })
 
 app.on('window-all-closed', () => {

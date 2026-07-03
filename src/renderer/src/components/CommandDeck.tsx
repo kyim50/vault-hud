@@ -25,7 +25,7 @@ export function CommandDeck({ commands }: { commands: { info: CommandInfo; statu
             style={{
               color:
                 status.state === 'failed' ? 'var(--danger)'
-                : status.state === 'running' ? 'var(--accent)'
+                : status.state === 'running' ? 'var(--clay)'
                 : 'var(--ink)'
             }}
           >

@@ -10,7 +10,7 @@ function age(mtime: number): string {
 
 export function DocumentsPanel({ docs }: { docs: VaultDoc[] }) {
   return (
-    <Panel title="Documents" corner="VAULT.TRAIL">
+    <Panel style={{ flex: 1 }} title="Documents" corner="VAULT.TRAIL">
       {docs.length === 0 && <div className="dim">nothing generated yet</div>}
       {docs.slice(0, 6).map((d) => (
         <div
