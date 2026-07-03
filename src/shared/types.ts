@@ -80,4 +80,6 @@ export interface HudSnapshot {
   commands: { info: CommandInfo; status: CommandStatus }[]
   primary: { label: string; value: number; target: number; unit: string }
   generatedAt: number
+  configCreated: boolean
+  configPath: string
 }

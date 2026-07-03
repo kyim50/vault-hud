@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, Tray } from 'electron'
 import { join } from 'node:path'
 import { IPC } from '@shared/ipc'
 import type { Directive } from '@shared/types'
-import { loadOrCreateConfig } from './config'
+import { loadOrCreateConfig, CONFIG_PATH } from './config'
 import { HudState } from './state'
 import { setDirectiveDone } from './collectors/vault'
 import { setupTray } from './tray'
@@ -33,12 +33,12 @@ function broadcast(): void {
 }
 
 app.whenReady().then(async () => {
-  const { config } = await loadOrCreateConfig()
+  const { config, created } = await loadOrCreateConfig()
   // In dev, commands/ lives at project root; in prod it's packaged alongside.
   const commandsDir = app.isPackaged
     ? join(process.resourcesPath, 'commands')
     : join(app.getAppPath(), 'commands')
-  state = new HudState(config, commandsDir)
+  state = new HudState(config, commandsDir, created, CONFIG_PATH)
   state.on('snapshot', broadcast)
 
   ipcMain.handle(IPC.getSnapshot, () => state.snapshot)

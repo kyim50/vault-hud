@@ -17,7 +17,7 @@ export default function App() {
       style={{
         display: 'grid',
         gridTemplateColumns: '280px 1fr 300px',
-        gridTemplateRows: '40px 1fr',
+        gridTemplateRows: snap.configCreated ? '40px auto 1fr' : '40px 1fr',
         gap: 8,
         height: '100vh',
         padding: 8
@@ -28,8 +28,36 @@ export default function App() {
           <div style={{ fontFamily: 'var(--font-pixel)', fontSize: 12, color: 'var(--ink)' }}>{snap.appName}</div>
           <div className="dim" style={{ fontSize: 9 }}>VOICE-FREE UNIFIED LOGIC TERMINAL</div>
         </div>
+        <div style={{ display: 'flex', gap: 14, fontSize: 10 }} className="dim">
+          <span>
+            <span className={snap.commands.some((c) => c.status.state === 'running') ? 'clay' : 'dim'}>●</span> CORE ·{' '}
+            {snap.commands.some((c) => c.status.state === 'running') ? 'BUSY' : 'IDLE'}
+          </span>
+          <span>
+            <span className={snap.docs.length > 0 || snap.directives.length > 0 ? 'clay' : 'dim'}>●</span> VAULT ·{' '}
+            {snap.docs.length > 0 || snap.directives.length > 0 ? 'LINKED' : 'EMPTY'}
+          </span>
+          <span>
+            <span className={snap.repos.filter((r) => r.branch !== '—').length > 0 ? 'clay' : 'dim'}>●</span> GIT ·{' '}
+            {snap.repos.filter((r) => r.branch !== '—').length}/{snap.repos.length}
+          </span>
+        </div>
         <Clock />
       </header>
+      {snap.configCreated && (
+        <div
+          style={{
+            gridColumn: '1 / -1',
+            border: '1px solid var(--line)',
+            background: 'var(--panel)',
+            padding: '6px 10px',
+            fontSize: 11
+          }}
+        >
+          <span className="clay">CONFIG CREATED</span> — edit <span className="clay">{snap.configPath}</span> to
+          prune repos, set your vault path, and tune the primary directive. Restart after editing.
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflowY: 'auto' }}>
         <VitalsPanel repos={snap.repos} usage={snap.usage} />
         <DirectivesPanel directives={snap.directives} />

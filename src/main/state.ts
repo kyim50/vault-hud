@@ -11,7 +11,9 @@ export class HudState extends EventEmitter {
 
   constructor(
     public config: VaultHudConfig,
-    commandsDir: string
+    commandsDir: string,
+    configCreated: boolean,
+    configPath: string
   ) {
     super()
     this.runner = new CommandRunner(commandsDir, config)
@@ -20,7 +22,9 @@ export class HudState extends EventEmitter {
       repos: [], usage: { windowTokens: 0, percent: 0, updatedAt: 0 },
       docs: [], directives: [], schedule: [], commands: [],
       primary: { label: config.primaryDirective.label, value: 0, target: config.primaryDirective.target, unit: config.primaryDirective.unit },
-      generatedAt: 0
+      generatedAt: 0,
+      configCreated,
+      configPath
     }
     this.runner.on('status', () => {
       this.snapshot.commands = this.runner.list()
