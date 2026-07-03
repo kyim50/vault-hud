@@ -84,3 +84,5 @@ button:active { transform: translate(1px, 1px); box-shadow: 0 0 0 0 #000; }
 
 @keyframes blink { 50% { opacity: 0.25; } }
 .blink { animation: blink 900ms steps(2, start) infinite; color: var(--accent); }
+
+body.notch { background: transparent; }

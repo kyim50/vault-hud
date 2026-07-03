@@ -1,12 +1,15 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, Tray } from 'electron'
 import { join } from 'node:path'
 import { IPC } from '@shared/ipc'
 import type { Directive } from '@shared/types'
 import { loadOrCreateConfig } from './config'
 import { HudState } from './state'
 import { setDirectiveDone } from './collectors/vault'
+import { setupTray } from './tray'
+import { createNotchWindow } from './notch'
 
 let state: HudState
+let tray: Tray
 
 function createHudWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -52,7 +55,19 @@ app.whenReady().then(async () => {
     )
   })
 
-  createHudWindow()
+  const hudWin = createHudWindow()
+  const showHud = (): void => {
+    const w = BrowserWindow.getAllWindows().find((x) => x.getTitle() === 'V.A.U.L.T.')
+    if (w && !w.isDestroyed()) {
+      w.show()
+      w.focus()
+    } else {
+      createHudWindow()
+    }
+  }
+  tray = setupTray(state, showHud)
+  createNotchWindow()
+
   void state.start()
 
   app.on('activate', () => {
@@ -61,5 +76,5 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
-  app.quit() // becomes no-quit in Task 11 when tray exists
+  if (process.platform !== 'darwin') app.quit()
 })
