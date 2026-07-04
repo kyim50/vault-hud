@@ -8,11 +8,14 @@ import { SchedulePanel } from '../components/SchedulePanel'
 import { PrimaryDirective } from '../components/PrimaryDirective'
 import { Clock } from '../components/Clock'
 import { CoreScene } from '../components/CoreScene'
+import { Parade } from '../components/Parade'
 
 export default function App() {
   const snap = useSnapshot()
   if (!snap) return <p style={{ padding: 16 }}>booting…</p>
   return (
+    <>
+    <Parade />
     <div
       style={{
         display: 'grid',
@@ -76,5 +79,6 @@ export default function App() {
         <SchedulePanel schedule={snap.schedule} />
       </div>
     </div>
+    </>
   )
 }

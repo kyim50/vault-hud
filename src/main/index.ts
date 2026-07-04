@@ -10,6 +10,7 @@ import { createNotchWindow } from './notch'
 
 let state: HudState
 let tray: Tray
+let hudWin: BrowserWindow | null = null
 
 function createHudWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -23,13 +24,30 @@ function createHudWindow(): BrowserWindow {
   } else {
     win.loadFile(join(__dirname, '../renderer/hud.html'))
   }
+  win.on('closed', () => {
+    if (hudWin === win) hudWin = null
+  })
+  hudWin = win
   return win
+}
+
+// terminal-style live title: "vault — ◉ 41% · ▶ plan today"
+function hudTitle(): string {
+  const s = state.snapshot
+  const running = s.commands.find((c) => c.status.state === 'running')
+  const parts = [`vault — ◉ ${s.usage.percent}%`]
+  if (running) parts.push(`▶ ${running.info.label.toLowerCase()}`)
+  else if (s.directives.length > 0) {
+    parts.push(`${s.directives.filter((d) => d.done).length}/${s.directives.length} directives`)
+  }
+  return parts.join(' · ')
 }
 
 function broadcast(): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send(IPC.snapshotUpdate, state.snapshot)
   }
+  if (hudWin && !hudWin.isDestroyed()) hudWin.setTitle(hudTitle())
 }
 
 app.whenReady().then(async () => {
@@ -60,10 +78,9 @@ app.whenReady().then(async () => {
 
   createHudWindow()
   const showHud = (): void => {
-    const w = BrowserWindow.getAllWindows().find((x) => x.getTitle() === 'vault')
-    if (w && !w.isDestroyed()) {
-      w.show()
-      w.focus()
+    if (hudWin && !hudWin.isDestroyed()) {
+      hudWin.show()
+      hudWin.focus()
     } else {
       createHudWindow()
     }

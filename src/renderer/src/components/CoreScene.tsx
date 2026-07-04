@@ -197,18 +197,20 @@ function sceneSurf(ctx: Ctx, f: number, blink: boolean): void {
     const sigma = x < 146 ? 34 : 70
     return 102 - 66 * Math.exp(-((x - 146) ** 2) / (2 * sigma * sigma))
   }
+  // water dots scroll left so the wave visibly flows
+  const flow = Math.floor(f * 1.6)
   for (let x = 0; x < W; x += 2) {
     const top = surface(x)
-    // foam edge along the crest
-    if (hash(x, 999) < 0.75) ctx.fillRect(x, Math.round(top), 1, 1)
+    // foam edge shimmers along the crest
+    if (hash(x + flow, 999) < 0.75) ctx.fillRect(x, Math.round(top), 1, 1)
     for (let y = Math.round(top) + 2; y < H; y += 2) {
       const depth = (y - top) / (H - top)
-      if (hash(x, y) < 0.1 + depth * 0.42) ctx.fillRect(x, y, 1, 1)
+      if (hash(x + flow, y) < 0.1 + depth * 0.42) ctx.fillRect(x, y, 1, 1)
     }
   }
-  // dense water band at the bottom
+  // dense water band at the bottom, drifting slower
   for (let y = 98; y < H; y += 2) {
-    for (let x = 0; x < W; x += 2) if (hash(x, y + 7) < 0.55) ctx.fillRect(x, y, 1, 1)
+    for (let x = 0; x < W; x += 2) if (hash(x + Math.floor(f * 0.8), y + 7) < 0.55) ctx.fillRect(x, y, 1, 1)
   }
   // curl hooking left off the peak (bezier from crest down-left)
   const p0 = { x: 146, y: 33 }
@@ -231,7 +233,8 @@ function sceneSurf(ctx: Ctx, f: number, blink: boolean): void {
   const mx = 96 + Math.sin(f / 10) * 8
   let surfY = H
   for (let x = mx - 4; x <= mx + 50; x += 4) surfY = Math.min(surfY, surface(x))
-  const boardY = Math.round(surfY) + 1 + (Math.floor(f / 4) % 2)
+  // the rider rises and dips with the swell
+  const boardY = Math.round(surfY + 1 + Math.sin(f / 6) * 3.5)
   ctx.fillStyle = BODY_LIGHT
   ctx.fillRect(Math.round(mx - 4), boardY, 54, 3)
   drawSprite(ctx, SPRITE.slice(0, 12), Math.round(mx), boardY - 24, CELL, blink)
@@ -486,9 +489,100 @@ function sceneNight(ctx: Ctx, f: number, blink: boolean): void {
   drawBuddy(ctx, f, blink, 140, horizon, 8)
 }
 
-const SCENES = [sceneMeadow, sceneSurf, sceneGarden, sceneDisco, sceneGlobe, sceneNight]
+function sceneRain(ctx: Ctx, f: number, blink: boolean): void {
+  ctx.fillStyle = INK
+  // heavy clouds
+  drawCloud(ctx, 40, 12, 30, 8)
+  drawCloud(ctx, 110, 8, 34, 7)
+  drawCloud(ctx, 168, 14, 22, 6)
+  const horizon = 92
+  // slanted rain streaks
+  for (let i = 0; i < 46; i++) {
+    const rx = (hash(i, 5) * W + f * 1.2) % W
+    const ry = (hash(i, 9) * H + f * 5) % (horizon - 18) + 18
+    ctx.fillRect(Math.round(rx), Math.round(ry), 1, 3)
+    ctx.fillRect(Math.round(rx) + 1, Math.round(ry) - 2, 1, 2)
+  }
+  drawGround(ctx, horizon, 0.32)
+  // puddle with ripple rings
+  const px = 132
+  for (let x = -16; x <= 16; x += 2) {
+    if (hash(x + 50, 2) < 0.7) ctx.fillRect(px + x, horizon + 6, 1, 1)
+  }
+  const rip = (f % 18) / 18
+  const rr = Math.round(rip * 12)
+  for (let a = 0; a < Math.PI * 2; a += 0.5) {
+    if (rip < 0.8) ctx.fillRect(Math.round(px + Math.cos(a) * rr), Math.round(horizon + 6 + Math.sin(a) * rr * 0.3), 1, 1)
+  }
+  // critter under an umbrella, buddy splashing in the puddle
+  const mx = wander(f, 44, 84, 0.3)
+  const moving = Math.abs(wander(f + 1, 44, 84, 0.3) - mx) > 0.05
+  drawWalker(ctx, f, blink, mx, horizon, moving)
+  // umbrella: dotted canopy + gray stem
+  const ux = Math.round(mx) + 21
+  for (let x = -16; x <= 16; x += 2) {
+    const y = -Math.round(Math.sqrt(Math.max(0, 256 - x * x)) * 0.45)
+    ctx.fillRect(ux + x, horizon - 40 + y, 1, 1)
+    if (hash(x, 77) < 0.5) ctx.fillRect(ux + x, horizon - 39 + y, 1, 1)
+  }
+  ctx.fillStyle = GRAY
+  ctx.fillRect(ux, horizon - 40, 1, 14)
+  drawBuddy(ctx, f, blink, px - 8 + Math.sin(f / 5) * 3, horizon + 4, 3)
+}
+
+function sceneRooftop(ctx: Ctx, f: number, blink: boolean): void {
+  ctx.fillStyle = INK
+  // stars + moon
+  for (let i = 0; i < 30; i++) {
+    if (hash(i, Math.floor(f / 6)) > 0.35) {
+      ctx.fillRect(Math.round(hash(i, 11) * (W - 8)) + 4, Math.round(hash(i, 13) * 40) + 4, 1, 1)
+    }
+  }
+  drawCloud(ctx, 30, 16, 9, 8)
+  // skyline: dotted towers with twinkling windows
+  const towers = [
+    [8, 56, 22], [36, 44, 18], [60, 62, 16], [82, 38, 24], [112, 52, 20], [138, 46, 16], [160, 58, 26]
+  ]
+  for (const [tx, ty, tw] of towers) {
+    for (let x = tx; x <= tx + tw; x += 2) {
+      ctx.fillRect(x, ty, 1, 1)
+      if (hash(x, ty) < 0.3) ctx.fillRect(x, ty + 1, 1, 1)
+    }
+    for (let y = ty; y < 88; y += 2) {
+      ctx.fillRect(tx, y, 1, 1)
+      ctx.fillRect(tx + tw, y, 1, 1)
+    }
+    // lit windows blink slowly
+    for (let wy = ty + 4; wy < 84; wy += 6) {
+      for (let wx = tx + 3; wx < tx + tw - 2; wx += 5) {
+        if (hash(wx, wy + Math.floor(f / 30)) > 0.55) ctx.fillRect(wx, wy, 2, 2)
+      }
+    }
+  }
+  // foreground rooftop
+  for (let x = 0; x < W; x += 1) ctx.fillRect(x, 88, 1, 1)
+  for (let y = 90; y < H; y += 2) {
+    for (let x = 0; x < W; x += 2) if (hash(x, y) < 0.3) ctx.fillRect(x, y, 1, 1)
+  }
+  // antenna with a blinking clay beacon
+  ctx.fillRect(160, 66, 1, 22)
+  ctx.fillRect(156, 72, 9, 1)
+  if (Math.floor(f / 6) % 2 === 0) {
+    ctx.fillStyle = BODY
+    ctx.fillRect(159, 63, 3, 3)
+    ctx.fillStyle = INK
+  }
+  // critter and buddy sitting on the edge, looking at the city
+  drawSprite(ctx, SPRITE.slice(0, 12), 66, 88 - 24 + (Math.floor(f / 8) % 2), CELL, blink)
+  drawBuddy(ctx, f, blink, 104, 88 + 2, 8)
+  // a bird crosses the skyline
+  const t = f % 130
+  if (t < 80) drawBird(ctx, W - t * 2.6, 30 + Math.sin(t / 6) * 4, Math.floor(t / 3) % 2 === 0)
+}
+
+const SCENES = [sceneMeadow, sceneSurf, sceneGarden, sceneDisco, sceneGlobe, sceneNight, sceneRain, sceneRooftop]
 const DISCO = 3
-const TRANS_FRAMES = 32 // ~2.7s: dissolve → linked orb → scatter into next scene
+const TRANS_FRAMES = 42 // ~3.5s: dissolve → linked orb → scatter into next scene
 
 interface Particle {
   sx: number; sy: number // start (pixel of outgoing scene)
@@ -600,33 +694,40 @@ export function CoreScene({ usagePercent, busy }: { usagePercent: number; busy: 
   useEffect(() => {
     const canvas = ref.current!
     const ctx = canvas.getContext('2d')!
-    let frame = 0
     let parts: Particle[] | null = null
+    let partsSlot = -1
+    let raf = 0
+    let lastFrame = -1
+    const start = performance.now()
 
-    const draw = (): void => {
-      ctx.clearRect(0, 0, W, H)
-      const blinkEvery = usageRef.current > 80 ? 24 : 48
+    // scenes step at a chunky 12fps; the transition runs on continuous time
+    // at full refresh rate so the orb glides instead of stuttering
+    const loop = (now: number): void => {
+      const tf = ((now - start) / 1000) * FPS // fractional frame clock
+      const frame = Math.floor(tf)
       const slot = Math.floor(frame / SCENE_FRAMES)
       const sceneIdx = busyRef.current ? DISCO : slot % SCENES.length
-      const inScene = frame % SCENE_FRAMES
+      const inScene = tf - slot * SCENE_FRAMES
       if (inScene < TRANS_FRAMES && slot > 0 && !busyRef.current) {
-        // pixels of the outgoing scene circulate into a linked orb, then
-        // scatter out as the incoming scene
-        if (inScene === 0 || !parts) {
+        if (partsSlot !== slot) {
           const prev = (slot - 1) % SCENES.length
           parts = buildParticles(prev, sceneIdx, frame - 1, frame + TRANS_FRAMES)
+          partsSlot = slot
         }
-        drawTransition(ctx, parts, inScene / TRANS_FRAMES)
-      } else {
+        ctx.clearRect(0, 0, W, H)
+        drawTransition(ctx, parts!, inScene / TRANS_FRAMES)
+        lastFrame = -1
+      } else if (frame !== lastFrame) {
         parts = null
-        const blinking = frame % blinkEvery >= blinkEvery - 6
-        SCENES[sceneIdx](ctx, frame, blinking)
+        const blinkEvery = usageRef.current > 80 ? 24 : 48
+        ctx.clearRect(0, 0, W, H)
+        SCENES[sceneIdx](ctx, frame, frame % blinkEvery >= blinkEvery - 6)
+        lastFrame = frame
       }
-      frame++
+      raf = requestAnimationFrame(loop)
     }
-    draw()
-    const timer = setInterval(draw, 1000 / FPS)
-    return () => clearInterval(timer)
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
   }, [])
   return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0 }}>
