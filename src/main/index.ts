@@ -5,7 +5,7 @@ import type { CustomSprite, Directive, RepoConfig, VaultHudConfig } from '@share
 import { loadOrCreateConfig, saveConfig, CONFIG_PATH } from './config'
 import { loadSprites, saveSprite as persistSprite, deleteSprite as removeSprite } from './sprites'
 import { HudState } from './state'
-import { setDirectiveDone } from './collectors/vault'
+import { appendCapture, setDirectiveDone } from './collectors/vault'
 import { setupTray } from './tray'
 import { createNotchWindow } from './notch'
 
@@ -100,6 +100,14 @@ app.whenReady().then(async () => {
       await state.refreshVault()
     } catch (e) {
       console.error('vault-hud: deleteSprite failed', e)
+    }
+  })
+  ipcMain.on(IPC.capture, async (_e, text: string) => {
+    try {
+      await appendCapture(config, text)
+      await state.refreshVault()
+    } catch (e) {
+      console.error('vault-hud: capture failed', e)
     }
   })
   ipcMain.on(IPC.openDoc, (_e, relPath: string) => {

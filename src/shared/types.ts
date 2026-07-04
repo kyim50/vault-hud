@@ -91,6 +91,7 @@ export interface HudSnapshot {
   pet: { name: string; xp: number }
   ui: { theme: 'terminal' | 'paper'; parade: boolean }
   sprites: CustomSprite[]
+  brain: { recent: VaultDoc[]; resurfaced: VaultDoc | null }
   generatedAt: number
   configCreated: boolean
   configPath: string

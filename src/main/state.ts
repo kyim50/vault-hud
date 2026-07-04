@@ -25,6 +25,7 @@ export class HudState extends EventEmitter {
       pet: { ...config.pet },
       ui: { ...config.ui },
       sprites: [],
+      brain: { recent: [], resurfaced: null },
       generatedAt: 0,
       configCreated,
       configPath
@@ -65,7 +66,8 @@ export class HudState extends EventEmitter {
   }
 
   async refreshVault(publish = true): Promise<void> {
-    const { docs, skills, directives, schedule } = await collectVaultData(this.config)
+    const { docs, skills, directives, schedule, brain } = await collectVaultData(this.config)
+    this.snapshot.brain = brain
     this.snapshot.docs = docs
     this.snapshot.skills = skills
     this.snapshot.directives = directives

@@ -9,7 +9,8 @@ export const IPC = {
   notchResize: 'notch:resize',
   updateConfig: 'config:update',
   saveSprite: 'sprite:save',
-  deleteSprite: 'sprite:delete'
+  deleteSprite: 'sprite:delete',
+  capture: 'vault:capture'
 } as const
 
 export interface VaultApi {
@@ -22,6 +23,7 @@ export interface VaultApi {
   updateConfig(patch: { ui?: Partial<{ theme: 'terminal' | 'paper'; parade: boolean }>; petName?: string; repos?: RepoConfig[] }): void
   saveSprite(sprite: CustomSprite): void
   deleteSprite(name: string): void
+  capture(text: string): void
 }
 
 declare global {

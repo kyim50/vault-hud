@@ -4,7 +4,7 @@ import { Panel } from '../components/Panel'
 import { VitalsPanel } from '../components/VitalsPanel'
 import { CommandDeck } from '../components/CommandDeck'
 import { DirectivesPanel } from '../components/DirectivesPanel'
-import { DocumentsPanel } from '../components/DocumentsPanel'
+import { SecondBrainPanel } from '../components/SecondBrainPanel'
 import { SchedulePanel } from '../components/SchedulePanel'
 import { PrimaryDirective } from '../components/PrimaryDirective'
 import { Clock } from '../components/Clock'
@@ -83,7 +83,7 @@ export default function App() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflowY: 'auto' }}>
         <VitalsPanel repos={snap.repos} usage={snap.usage} />
         <DirectivesPanel directives={snap.directives} />
-        <DocumentsPanel docs={snap.docs} />
+        <SecondBrainPanel recent={snap.brain.recent} resurfaced={snap.brain.resurfaced} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
         <Panel title="Core" corner="ALIVE" style={{ flex: 1 }}>

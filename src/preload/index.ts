@@ -15,5 +15,6 @@ contextBridge.exposeInMainWorld('vault', {
   resizeNotch: (expanded: boolean) => ipcRenderer.send(IPC.notchResize, expanded),
   updateConfig: (patch: unknown) => ipcRenderer.send(IPC.updateConfig, patch),
   saveSprite: (sprite: CustomSprite) => ipcRenderer.send(IPC.saveSprite, sprite),
-  deleteSprite: (name: string) => ipcRenderer.send(IPC.deleteSprite, name)
+  deleteSprite: (name: string) => ipcRenderer.send(IPC.deleteSprite, name),
+  capture: (text: string) => ipcRenderer.send(IPC.capture, text)
 })
