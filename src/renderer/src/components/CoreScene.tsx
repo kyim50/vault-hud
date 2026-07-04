@@ -582,7 +582,7 @@ function sceneRooftop(ctx: Ctx, f: number, blink: boolean): void {
 
 const SCENES = [sceneMeadow, sceneSurf, sceneGarden, sceneDisco, sceneGlobe, sceneNight, sceneRain, sceneRooftop]
 const DISCO = 3
-const TRANS_FRAMES = 42 // ~3.5s: dissolve → linked orb → scatter into next scene
+const TRANS_FRAMES = 24 // ~2s: dissolve → linked orb → scatter into next scene
 
 interface Particle {
   sx: number; sy: number // start (pixel of outgoing scene)

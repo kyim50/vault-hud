@@ -11,7 +11,7 @@ import { Clock } from '../components/Clock'
 import { CoreScene } from '../components/CoreScene'
 import { Parade } from '../components/Parade'
 import { SkillsPanel } from '../components/SkillsPanel'
-import { PetBox } from '../components/PetBox'
+import { RoamingPet } from '../components/RoamingPet'
 import { SettingsPanel } from '../components/SettingsPanel'
 
 export default function App() {
@@ -24,7 +24,7 @@ export default function App() {
   return (
     <>
     <Parade enabled={snap.ui.parade} sprites={snap.sprites.filter((sp) => sp.use === 'parade')} />
-    <PetBox name={snap.pet.name} xp={snap.pet.xp} busy={snap.commands.some((c) => c.status.state === 'running')} skin={snap.sprites.find((sp) => sp.use === 'pet')?.grid} />
+    <RoamingPet name={snap.pet.name} xp={snap.pet.xp} busy={snap.commands.some((c) => c.status.state === 'running')} skin={snap.sprites.find((sp) => sp.use === 'pet')?.grid} />
     <div
       style={{
         display: 'grid',
@@ -86,7 +86,7 @@ export default function App() {
         <SecondBrainPanel recent={snap.brain.recent} resurfaced={snap.brain.resurfaced} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
-        <Panel title="Core" corner="ALIVE" style={{ flex: 1 }}>
+        <Panel title="Core" corner="ALIVE" style={{ flex: 1, border: 'none', padding: '8px 0' }}>
           <CoreScene usagePercent={snap.usage.percent} busy={snap.commands.some((c) => c.status.state === 'running')} />
           <div style={{ borderTop: '1px dotted var(--line-soft)', paddingTop: 8 }}>
             <PrimaryDirective {...snap.primary} />

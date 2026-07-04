@@ -53,13 +53,21 @@ export function Parade({ enabled, sprites }: { enabled: boolean; sprites: { name
       const kind = hasCustom && roll < 0.3 ? 'custom' : roll < 0.55 ? 'buddy' : roll < 0.82 ? 'bird' : 'snail'
       const dir = h(frame, 7) < 0.5 ? 1 : -1
       const grid = kind === 'custom' ? spritesRef.current[Math.floor(h(frame, 11) * spritesRef.current.length)].grid : undefined
+      const startX = dir === 1 ? -30 : canvas.width + 30
       walkers.push({
         kind,
         grid,
-        x: dir === 1 ? -30 : canvas.width + 30,
+        x: startX,
         dir: dir as 1 | -1,
         speed: kind === 'bird' ? 2.4 : kind === 'snail' ? 0.35 : kind === 'custom' ? 0.9 : 1.1
       })
+      // birds often travel in small flocks
+      if (kind === 'bird') {
+        const extra = h(frame, 13) < 0.6 ? 1 + Math.floor(h(frame, 17) * 2) : 0
+        for (let k = 1; k <= extra; k++) {
+          walkers.push({ kind: 'bird', x: startX - dir * (14 + k * 12), dir: dir as 1 | -1, speed: 2.4 })
+        }
+      }
     }
 
     const draw = (): void => {
@@ -68,8 +76,9 @@ export function Parade({ enabled, sprites }: { enabled: boolean; sprites: { name
         frame++
         return
       }
-      // every ~25-45s, someone strolls by (keep at most 2 on screen)
-      if (walkers.length < 2 && frame % (300 + Math.floor(h(Math.floor(frame / 300), 3) * 240)) === 299) spawn()
+      // every ~10-22s someone strolls or flies by (up to 3 on screen)
+      if (walkers.length < 3 && frame % (120 + Math.floor(h(Math.floor(frame / 120), 3) * 150)) === 119) spawn()
+      if (frame === 30) spawn() // someone shows up soon after launch
       for (let i = walkers.length - 1; i >= 0; i--) {
         const w = walkers[i]
         w.x += w.dir * w.speed

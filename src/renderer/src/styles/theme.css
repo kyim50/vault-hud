@@ -47,14 +47,18 @@ body {
   font-size: 12px;
   line-height: 1.45;
   overflow: hidden;
-  -webkit-font-smoothing: none; /* crunchy text — part of the look */
+  -webkit-font-smoothing: antialiased; /* body text reads clean */
 }
 
-/* chunky pixel border via hard offset shadow (no blur anywhere) */
+/* only the pixel display face stays crunchy */
+.panel-title, .px {
+  -webkit-font-smoothing: none;
+}
+
+/* structure panels are airy: hairline only, no shadow — chunk lives on buttons */
 .panel {
   background: var(--panel);
-  border: 1px solid var(--line);
-  box-shadow: 2px 2px 0 0 var(--line);
+  border: 1px solid var(--line-soft);
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
