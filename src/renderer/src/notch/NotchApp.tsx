@@ -62,9 +62,8 @@ function MiniMascot() {
   )
 }
 
-// window mounts collapsed at (menu-bar height + 4), so the physical notch
-// height is what we started with
-const NOTCH_H = Math.max(30, window.innerHeight - 4)
+// the main process passes the real menu-bar height in the URL hash
+const NOTCH_H = Math.max(24, Number(new URLSearchParams(window.location.hash.slice(1)).get('mh')) || 37)
 
 export default function NotchApp() {
   const snap = useSnapshot()
@@ -73,28 +72,43 @@ export default function NotchApp() {
   useEffect(() => {
     window.vault.resizeNotch(expanded)
   }, [expanded])
+  // while dormant the window forwards mousemoves without capturing clicks —
+  // expand only when the pointer is actually in the notch strip
+  useEffect(() => {
+    if (expanded) return
+    const onMove = (e: MouseEvent): void => {
+      const cx = window.innerWidth / 2
+      if (e.clientY <= NOTCH_H + 2 && Math.abs(e.clientX - cx) < 130) setExpanded(true)
+    }
+    window.addEventListener('mousemove', onMove)
+    return () => window.removeEventListener('mousemove', onMove)
+  }, [expanded])
   const running = snap?.commands.find((c) => c.status.state === 'running')
 
   const label = { fontFamily: 'var(--font-pixel)', fontSize: 7, letterSpacing: 1 } as const
   const mono = { fontFamily: 'var(--font-mono)', fontSize: 10 } as const
 
   return (
-    // invisible hover target over the hardware notch; when the pointer slides
-    // under the notch the island materializes as a continuation of it — the
-    // top strip sits at menu-bar level, flush with the notch itself
+    // the island unfurls from the hardware notch: scaleY from the top edge +
+    // fade, pure CSS on a fixed-size window, so the motion is fluid
     <div
-      onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
       style={{
         height: '100vh',
-        background: expanded ? '#000' : 'transparent',
+        background: '#000',
         borderRadius: '0 0 18px 18px',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
         color: CREAM,
         opacity: expanded ? 1 : 0,
-        transition: 'opacity 160ms ease'
+        transform: expanded ? 'scaleY(1)' : 'scaleY(0.24)',
+        transformOrigin: 'top center',
+        transition: expanded
+          ? 'transform 300ms cubic-bezier(0.32, 1.3, 0.36, 1), opacity 170ms ease-out'
+          : 'transform 220ms cubic-bezier(0.4, 0, 0.6, 1), opacity 160ms ease-in',
+        pointerEvents: expanded ? 'auto' : 'none',
+        willChange: 'transform, opacity'
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 18px', height: NOTCH_H, flexShrink: 0 }}>
