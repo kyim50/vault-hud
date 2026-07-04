@@ -16,6 +16,7 @@ export interface VaultHudConfig {
     source: 'commitsThisWeek' | 'manual'
     manualValue?: number
   }
+  pet: { name: string; xp: number }
 }
 
 export interface RepoStats {
@@ -80,6 +81,7 @@ export interface HudSnapshot {
   schedule: ScheduleItem[]
   commands: { info: CommandInfo; status: CommandStatus }[]
   primary: { label: string; value: number; target: number; unit: string }
+  pet: { name: string; xp: number }
   generatedAt: number
   configCreated: boolean
   configPath: string

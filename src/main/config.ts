@@ -32,7 +32,8 @@ export function buildDefaultConfig(opts: {
       target: 30,
       unit: 'commits',
       source: 'commitsThisWeek'
-    }
+    },
+    pet: { name: 'pip', xp: 0 }
   }
 }
 
@@ -51,7 +52,8 @@ export function mergeConfig(partial: unknown, defaults: VaultHudConfig): VaultHu
     primaryDirective: {
       ...defaults.primaryDirective,
       ...(isPlainObject(p.primaryDirective) ? p.primaryDirective : {})
-    }
+    },
+    pet: { ...defaults.pet, ...(isPlainObject(p.pet) ? p.pet : {}) }
   }
 }
 
@@ -123,4 +125,13 @@ export async function loadOrCreateConfig(): Promise<{
 
   const config = mergeConfig(parsed, await detectDefaults())
   return { config, created: false }
+}
+
+export async function saveConfig(config: VaultHudConfig): Promise<void> {
+  try {
+    await fs.mkdir(CONFIG_DIR, { recursive: true })
+    await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2))
+  } catch {
+    /* fail soft: persistence is best-effort */
+  }
 }

@@ -10,6 +10,7 @@ import { Clock } from '../components/Clock'
 import { CoreScene } from '../components/CoreScene'
 import { Parade } from '../components/Parade'
 import { SkillsPanel } from '../components/SkillsPanel'
+import { PetBox } from '../components/PetBox'
 
 export default function App() {
   const snap = useSnapshot()
@@ -17,6 +18,7 @@ export default function App() {
   return (
     <>
     <Parade />
+    <PetBox name={snap.pet.name} xp={snap.pet.xp} busy={snap.commands.some((c) => c.status.state === 'running')} />
     <div
       style={{
         display: 'grid',

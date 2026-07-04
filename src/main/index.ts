@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, Tray } from 'electron'
 import { join } from 'node:path'
 import { IPC } from '@shared/ipc'
 import type { Directive } from '@shared/types'
-import { loadOrCreateConfig, CONFIG_PATH } from './config'
+import { loadOrCreateConfig, saveConfig, CONFIG_PATH } from './config'
 import { HudState } from './state'
 import { setDirectiveDone } from './collectors/vault'
 import { setupTray } from './tray'
@@ -64,6 +64,10 @@ app.whenReady().then(async () => {
   ipcMain.on(IPC.toggleDirective, async (_e, d: Directive, done: boolean) => {
     try {
       await setDirectiveDone(config, d, done)
+      if (done) {
+        config.pet.xp += 1
+        void saveConfig(config)
+      }
       await state.refreshVault()
     } catch (e) {
       console.error('vault-hud: toggleDirective failed', e)
