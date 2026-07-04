@@ -40,12 +40,28 @@ async function listDocs(config: VaultHudConfig): Promise<VaultDoc[]> {
   return docs.sort((a, b) => b.mtime - a.mtime)
 }
 
+async function listSkills(config: VaultHudConfig): Promise<VaultDoc[]> {
+  const dir = join(config.vaultPath, 'Skills')
+  const out: VaultDoc[] = []
+  try {
+    for (const e of await fs.readdir(dir, { withFileTypes: true })) {
+      if (!e.isFile() || !e.name.endsWith('.md')) continue
+      try {
+        const stat = await fs.stat(join(dir, e.name))
+        out.push({ title: e.name.replace(/\.md$/, ''), relPath: join('Skills', e.name), folder: 'Skills', mtime: stat.mtimeMs })
+      } catch { /* skip file */ }
+    }
+  } catch { /* no Skills yet */ }
+  return out.sort((a, b) => b.mtime - a.mtime)
+}
+
 export async function collectVaultData(config: VaultHudConfig): Promise<{
   docs: VaultDoc[]
+  skills: VaultDoc[]
   directives: Directive[]
   schedule: ScheduleItem[]
 }> {
-  if (!config.vaultPath) return { docs: [], directives: [], schedule: [] }
+  if (!config.vaultPath) return { docs: [], skills: [], directives: [], schedule: [] }
   const allDocs = await listDocs(config).catch(() => [] as VaultDoc[])
   const docs = allDocs.slice(0, 12)
 
@@ -67,7 +83,8 @@ export async function collectVaultData(config: VaultHudConfig): Promise<{
       /* fail soft */
     }
   }
-  return { docs, directives, schedule }
+  const skills = await listSkills(config)
+  return { docs, skills, directives, schedule }
 }
 
 export async function setDirectiveDone(

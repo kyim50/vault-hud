@@ -20,7 +20,7 @@ export class HudState extends EventEmitter {
     this.snapshot = {
       appName: config.appName,
       repos: [], usage: { windowTokens: 0, percent: 0, updatedAt: 0 },
-      docs: [], directives: [], schedule: [], commands: [],
+      docs: [], skills: [], directives: [], schedule: [], commands: [],
       primary: { label: config.primaryDirective.label, value: 0, target: config.primaryDirective.target, unit: config.primaryDirective.unit },
       generatedAt: 0,
       configCreated,
@@ -62,8 +62,9 @@ export class HudState extends EventEmitter {
   }
 
   async refreshVault(publish = true): Promise<void> {
-    const { docs, directives, schedule } = await collectVaultData(this.config)
+    const { docs, skills, directives, schedule } = await collectVaultData(this.config)
     this.snapshot.docs = docs
+    this.snapshot.skills = skills
     this.snapshot.directives = directives
     this.snapshot.schedule = schedule
     if (publish) this.publish()

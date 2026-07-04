@@ -9,6 +9,7 @@ import { PrimaryDirective } from '../components/PrimaryDirective'
 import { Clock } from '../components/Clock'
 import { CoreScene } from '../components/CoreScene'
 import { Parade } from '../components/Parade'
+import { SkillsPanel } from '../components/SkillsPanel'
 
 export default function App() {
   const snap = useSnapshot()
@@ -77,6 +78,7 @@ export default function App() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflowY: 'auto' }}>
         <CommandDeck commands={snap.commands} />
         <SchedulePanel schedule={snap.schedule} />
+        <SkillsPanel skills={snap.skills} />
       </div>
     </div>
     </>

@@ -3,7 +3,7 @@ import { Panel } from './Panel'
 
 export function SchedulePanel({ schedule }: { schedule: ScheduleItem[] }) {
   return (
-    <Panel style={{ flex: 1 }} title="Schedule" corner="TODAY">
+    <Panel title="Schedule" corner="TODAY">
       {schedule.length === 0 && <div className="dim">no schedule — run MORNING BRIEF</div>}
       {schedule.map((s, i) => (
         <div key={i} style={{ display: 'flex', gap: 10 }}>

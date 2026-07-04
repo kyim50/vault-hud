@@ -75,6 +75,7 @@ export interface HudSnapshot {
   repos: RepoStats[]
   usage: ClaudeUsage
   docs: VaultDoc[]
+  skills: VaultDoc[]
   directives: Directive[]
   schedule: ScheduleItem[]
   commands: { info: CommandInfo; status: CommandStatus }[]
