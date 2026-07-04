@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { IPC } from '@shared/ipc'
 
 export const NOTCH_COLLAPSED = { width: 220, height: 34 }
-export const NOTCH_EXPANDED = { width: 360, height: 150 }
+export const NOTCH_EXPANDED = { width: 430, height: 152 }
 
 export function createNotchWindow(): BrowserWindow {
   const display = screen.getPrimaryDisplay()

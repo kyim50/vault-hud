@@ -7,7 +7,7 @@ import { DocumentsPanel } from '../components/DocumentsPanel'
 import { SchedulePanel } from '../components/SchedulePanel'
 import { PrimaryDirective } from '../components/PrimaryDirective'
 import { Clock } from '../components/Clock'
-import { Mascot } from '../components/Mascot'
+import { CoreScene } from '../components/CoreScene'
 
 export default function App() {
   const snap = useSnapshot()
@@ -65,7 +65,7 @@ export default function App() {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
         <Panel title="Core" corner="ALIVE" style={{ flex: 1 }}>
-          <Mascot usagePercent={snap.usage.percent} />
+          <CoreScene usagePercent={snap.usage.percent} busy={snap.commands.some((c) => c.status.state === 'running')} />
           <div style={{ borderTop: '1px dotted var(--line-soft)', paddingTop: 8 }}>
             <PrimaryDirective {...snap.primary} />
           </div>
