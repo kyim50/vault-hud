@@ -75,22 +75,27 @@ export default function NotchApp() {
   const mono = { fontFamily: 'var(--font-mono)', fontSize: 10 } as const
 
   return (
+    // invisible hover target hugging the hardware notch; the island only
+    // materializes when the pointer slides under the notch
     <div
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
       style={{
         height: '100vh',
-        background: '#000',
+        background: expanded ? '#000' : 'transparent',
         borderRadius: '0 0 18px 18px',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        color: CREAM
+        color: CREAM,
+        opacity: expanded ? 1 : 0,
+        transform: expanded ? 'translateY(0)' : 'translateY(-10px)',
+        transition: 'opacity 200ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1)'
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px', height: 33, flexShrink: 0 }}>
         <span style={{ ...label, fontSize: 8, color: running ? CLAY : CREAM }}>
-          {running ? `▶ ${running.info.label}` : 'V.A.U.L.T.'}
+          {running ? `▶ ${running.info.label}` : 'VAULT'}
         </span>
         <span style={{ ...label, fontSize: 8, color: snap && snap.usage.percent > 80 ? CLAY : DIM }}>
           ◉ {snap?.usage.percent ?? 0}%

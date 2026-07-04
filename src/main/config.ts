@@ -22,7 +22,7 @@ export function buildDefaultConfig(opts: {
   repoDirs: string[]
 }): VaultHudConfig {
   return {
-    appName: 'V.A.U.L.T.',
+    appName: 'VAULT',
     vaultPath: opts.vaultPath ?? '',
     dashboardFolder: 'Dashboard',
     repos: opts.repoDirs.map((p) => ({ name: basename(p), path: p })),

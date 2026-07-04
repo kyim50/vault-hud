@@ -24,7 +24,7 @@ export function setupTray(state: HudState, showHud: () => void): Tray {
           }))
         },
         { type: 'separator' },
-        { label: 'Quit V.A.U.L.T.', role: 'quit' }
+        { label: 'Quit VAULT', role: 'quit' }
       ])
     )
   }
