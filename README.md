@@ -1,94 +1,93 @@
-# V.A.U.L.T.
+# vault
 
-A desktop HUD for people who live in an Obsidian vault and a terminal. It sits
-on your menu bar (with a boring-notch-style island for quick commands) and
-opens into a three-panel dashboard: your git repos, your Claude usage window,
-your vault's directives/documents/schedule, and a command deck that fires
-`claude -p` prompts on demand.
+A halftone pixel HUD that wraps Claude Code. Live vitals for your repos, a
+one-click command deck that writes into your Obsidian vault, a clay mascot
+living through six animated scenes, a Boring Notch-style island under your
+MacBook notch, and a menu-bar readout of your Claude 5h window.
 
-Visually it's a "Claude FM" paper aesthetic — cream background, near-black
-ink, hairline borders, and a small clay-colored pixel mascot in the center
-panel that pulses with your Claude usage. Clay is reserved for the mascot
-and for live/danger states; everything else is monochrome.
+Ink dots on `#1e1e1e`. The mascot is the only thing with color.
 
-## Install & run
+## What it does
+
+- **System vitals** — commits this week, branch, and dirty files for every
+  repo you track, with pixel sparklines; plus your rolling Claude 5h-window
+  usage parsed from `~/.claude` transcripts.
+- **Command deck** — one-click buttons that run Claude Code headlessly:
+  Morning Brief, Plan Today, Plan Tmrw, Project Status, Wk Review. Every
+  command is a plain markdown prompt in `commands/` — edit them freely.
+  Output lands in your Obsidian vault as notes; the HUD is just a lens.
+- **Directives** — the top tasks from today's plan note; checking one writes
+  `- [x]` back into the markdown.
+- **Core** — the mascot rotating through meadow, surf, garden, disco, globe,
+  and night scenes; scene changes dissolve into a spinning constellation orb.
+  While a command runs it locks to the disco (Claude's cooking).
+- **Notch island** — invisible until you slide your pointer under the
+  hardware notch; expands into artwork + STATUS / PLAN / GIT / RUN tabs.
+- **Tray** — `◉ N%` of your Claude window, always visible, with a quick-run
+  menu.
+
+## Requirements
+
+- macOS (Apple Silicon or Intel — the app ships universal)
+- [Claude Code](https://claude.com/claude-code) installed and logged in
+  (`claude` must be on your PATH — the command deck shells out to it)
+- git
+- [Obsidian](https://obsidian.md) is optional but recommended; without a
+  vault the command outputs still land in the configured folder as markdown
+
+## Install (for friends)
+
+1. Grab `vault-<version>-universal.dmg` from `release/` (or the shared
+   link), open it, drag **vault** to Applications.
+2. First launch: the app is unsigned, so **right-click → Open → Open**
+   (Gatekeeper only asks once).
+3. On first run vault writes `~/.vault-hud/config.json`, auto-detecting
+   git repos on your Desktop and your Obsidian vault. Edit it (see below)
+   and relaunch.
+
+## Run from source
 
 ```bash
 npm install
-npm run dev      # electron-vite dev, HUD + notch windows
-npm run build    # production build to out/
-npm test         # vitest
-npm run typecheck # tsc --noEmit
+npm run dev                  # develop with hot reload
+npm run build && npm start   # production run
+npm run dist                 # build the universal .dmg/.zip into release/
+npm test                     # vitest
 ```
 
-On first launch, if no config exists yet, V.A.U.L.T. writes a starter config
-and shows a banner in the HUD telling you where it landed and what to check.
+## Config — `~/.vault-hud/config.json`
 
-## Config file
+| field | meaning |
+|---|---|
+| `appName` | the name in the header (default `vault`) |
+| `vaultPath` | absolute path to your Obsidian vault |
+| `dashboardFolder` | folder inside the vault for generated notes (`Dashboard`) |
+| `repos` | `{ name, path }[]` — prune the auto-detected list to what you care about |
+| `claude.windowHours` | rolling usage window (default 5) |
+| `claude.windowTokenLimit` | tokens ≙ 100% — tune to your plan |
+| `primaryDirective` | the big counter: `label`, `target`, `unit`, `source` (`commitsThisWeek` or `manual`) |
 
-Location: `~/.vault-hud/config.json`
+Restart the app after editing. A corrupted config is never overwritten —
+vault boots with in-memory defaults and leaves your file alone.
 
-On first run this is generated automatically: it tries to detect your open
-Obsidian vault (from `~/Library/Application Support/obsidian/obsidian.json`)
-and any git repos under `~/Desktop`. Edit it and restart the app to pick up
-changes.
+## Commands
 
-Fields:
-
-| Field | Type | Meaning |
-|---|---|---|
-| `appName` | string | Title shown in the HUD header. |
-| `vaultPath` | string | Absolute path to your Obsidian vault. |
-| `dashboardFolder` | string | Folder inside the vault (relative) where briefs/plans live, e.g. `Dashboard`. |
-| `repos` | `{ name, path }[]` | Git repos tracked in the Vitals panel and passed to commands as `{{repos}}`. |
-| `claude.windowHours` | number | Length of the Claude usage window (5h windows by default). |
-| `claude.windowTokenLimit` | number | Token budget for that window, used to compute the usage %. |
-| `primaryDirective` | object | The single counter shown under the mascot: `label`, `target`, `unit`, and `source` (`commitsThisWeek` to sum git commits across repos, or `manual` with a `manualValue`). |
-
-Prune `repos` down to what you actually want tracked, and point `vaultPath`
-at the vault you use for daily notes — the app fails soft on anything
-missing (no vault, no repos, no Obsidian) rather than crashing.
-
-## Command deck (`commands/`)
-
-Each `.md` file in `commands/` is a Claude Code prompt template that shows up
-as a button in the Command Deck panel. Format:
+Each file in `commands/` is one deck button:
 
 ```markdown
 ---
-label: PLAN TODAY
-description: Prioritized day plan from notes, calendar, open work
-allowed-tools: Read Write Glob Grep Bash(git -C:*) Bash(git status:*) Bash(git log:*)
+label: MORNING BRIEF
+description: Inbox + calendar + overnight git in one note
+allowed-tools: Read Write Glob Grep Bash(git -C:*)
 ---
-Prompt body goes here. Use {{vaultPath}}, {{dashboardFolder}}, {{date}},
-and {{repos}} — they're substituted before the prompt is sent to `claude -p`.
+The prompt. {{vaultPath}}, {{dashboardFolder}}, {{date}}, {{repos}}
+are filled in at run time.
 ```
 
-- The frontmatter's `label`/`description` populate the button and its
-  tooltip; `allowed-tools` maps to `claude`'s `--allowedTools` flag.
-- The body is rendered with the template variables above and piped to
-  `claude -p <prompt> --output-format text` in the configured cwd.
-- Runs are queued one at a time; state (`idle`/`queued`/`running`/`done`/
-  `failed`) and the last log are pushed back to the HUD live.
-- Add a new command by dropping another `.md` file in `commands/` and
-  restarting the app — no code changes needed.
-- Ship a new command with the app: five are included —
-  `morning-brief.md`, `plan-today.md`, `plan-tmrw.md`, `project-status.md`,
-  `week-review.md`.
+Commands run one at a time through `claude -p`; failures show a red state
+on the button — click it to read the log.
 
-## Vault as source of truth
+## Docs
 
-The Directives panel reads `- [ ]` / `- [x]` checkbox lines out of your
-vault's markdown files (under `dashboardFolder`) and writes toggles back to
-the same file — Obsidian and the HUD stay in sync because they're both just
-reading/writing the same notes. Clicking a document in the Documents panel
-opens it in Obsidian via an `obsidian://` deep link.
-
-## Spec & plan
-
-Design notes and the implementation plan this app was built from live in:
-
-- `docs/superpowers/specs/2026-07-03-vault-hud-design.md`
-- `docs/superpowers/plans/2026-07-03-vault-hud.md`
-
-Task briefs and reports for each build step are under `.superpowers/sdd/`.
+- Spec: `docs/superpowers/specs/2026-07-03-vault-hud-design.md`
+- Plan: `docs/superpowers/plans/2026-07-03-vault-hud.md`

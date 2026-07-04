@@ -9,7 +9,8 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dist": "electron-vite build && electron-builder --mac"
   },
   "dependencies": {
     "react": "^19.2.7",
@@ -21,9 +22,52 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.2.0",
     "electron": "^41.7.1",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "typescript": "^6.0.3",
     "vite": "^7.3.6",
     "vitest": "^4.1.9"
+  },
+  "productName": "vault",
+  "description": "A halftone pixel HUD that wraps Claude Code \u2014 live repo vitals, one-click commands into your Obsidian vault, a mascot with a life, and a Boring Notch-style island.",
+  "author": "Kimani McLeish",
+  "build": {
+    "appId": "com.kimanimcleish.vault",
+    "productName": "vault",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**"
+    ],
+    "extraResources": [
+      {
+        "from": "commands",
+        "to": "commands"
+      }
+    ],
+    "icon": "build/icon.png",
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "identity": null,
+      "darkModeSupport": true
+    },
+    "dmg": {
+      "title": "vault"
+    }
   }
 }
