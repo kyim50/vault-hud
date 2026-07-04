@@ -26,7 +26,7 @@ export default function App() {
       <header style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px dotted var(--line-soft)', paddingBottom: 4 }}>
         <div>
           <div style={{ fontFamily: 'var(--font-pixel)', fontSize: 12, color: 'var(--ink)' }}>{snap.appName}</div>
-          <div className="dim" style={{ fontSize: 9 }}>VOICE-FREE UNIFIED LOGIC TERMINAL</div>
+          <div className="dim" style={{ fontSize: 9 }}>voice-free unified logic terminal</div>
         </div>
         <div style={{ display: 'flex', gap: 14, fontSize: 10 }} className="dim">
           <span>

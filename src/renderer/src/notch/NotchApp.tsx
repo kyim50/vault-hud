@@ -62,6 +62,10 @@ function MiniMascot() {
   )
 }
 
+// window mounts collapsed at (menu-bar height + 4), so the physical notch
+// height is what we started with
+const NOTCH_H = Math.max(30, window.innerHeight - 4)
+
 export default function NotchApp() {
   const snap = useSnapshot()
   const [expanded, setExpanded] = useState(false)
@@ -75,8 +79,9 @@ export default function NotchApp() {
   const mono = { fontFamily: 'var(--font-mono)', fontSize: 10 } as const
 
   return (
-    // invisible hover target hugging the hardware notch; the island only
-    // materializes when the pointer slides under the notch
+    // invisible hover target over the hardware notch; when the pointer slides
+    // under the notch the island materializes as a continuation of it — the
+    // top strip sits at menu-bar level, flush with the notch itself
     <div
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
@@ -89,13 +94,13 @@ export default function NotchApp() {
         overflow: 'hidden',
         color: CREAM,
         opacity: expanded ? 1 : 0,
-        transform: expanded ? 'translateY(0)' : 'translateY(-10px)',
-        transition: 'opacity 200ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1)'
+        transition: 'opacity 160ms ease'
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px', height: 33, flexShrink: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 18px', height: NOTCH_H, flexShrink: 0 }}>
+        {/* these hug the wings either side of the physical notch */}
         <span style={{ ...label, fontSize: 8, color: running ? CLAY : CREAM }}>
-          {running ? `▶ ${running.info.label}` : 'VAULT'}
+          {running ? `▶ ${running.info.label}` : 'vault'}
         </span>
         <span style={{ ...label, fontSize: 8, color: snap && snap.usage.percent > 80 ? CLAY : DIM }}>
           ◉ {snap?.usage.percent ?? 0}%

@@ -27,7 +27,7 @@ describe('buildDefaultConfig', () => {
       vaultPath: '/Users/k/vault',
       repoDirs: ['/Users/k/Desktop/proj-a', '/Users/k/Desktop/proj-b']
     })
-    expect(cfg.appName).toBe('VAULT')
+    expect(cfg.appName).toBe('vault')
     expect(cfg.vaultPath).toBe('/Users/k/vault')
     expect(cfg.dashboardFolder).toBe('Dashboard')
     expect(cfg.repos).toEqual([

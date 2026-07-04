@@ -129,20 +129,48 @@ function drawButterfly(ctx: Ctx, f: number, x: number, y: number): void {
   ctx.fillRect(Math.round(x) + 1, Math.round(y), open ? 2 : 1, 1)
 }
 
+function drawHills(ctx: Ctx, horizon: number, seed: number): void {
+  ctx.fillStyle = INK
+  for (let x = 0; x < W; x += 2) {
+    const h1 = Math.sin(x / 34 + seed) * 7 + Math.sin(x / 13 + seed * 2) * 3
+    const top = horizon - 10 - h1
+    for (let y = Math.round(top); y < horizon; y += 2) {
+      if (hash(x, y + seed) < 0.14) ctx.fillRect(x, y, 1, 1)
+    }
+    if (hash(x, seed) < 0.5) ctx.fillRect(x, Math.round(top), 1, 1)
+  }
+}
+
+function drawFlower(ctx: Ctx, x: number, y: number, f: number): void {
+  ctx.fillStyle = INK
+  const sway = Math.floor(f / 8) % 2
+  ctx.fillRect(x + sway, y - 4, 1, 1)
+  ctx.fillRect(x - 1 + sway, y - 3, 3, 1)
+  ctx.fillRect(x + sway, y - 2, 1, 1)
+  ctx.fillRect(x, y - 1, 1, 1)
+}
+
 // --- scenes ------------------------------------------------------------
 
 function sceneMeadow(ctx: Ctx, f: number, blink: boolean): void {
   const drift = (f * 0.35) % (W + 120)
-  drawCloud(ctx, ((30 + drift) % (W + 120)) - 60, 20, 32, 10)
-  drawCloud(ctx, ((140 + drift * 0.6) % (W + 120)) - 60, 36, 22, 7)
+  drawCloud(ctx, ((30 + drift) % (W + 120)) - 60, 18, 32, 10)
+  drawCloud(ctx, ((140 + drift * 0.6) % (W + 120)) - 60, 34, 22, 7)
+  drawCloud(ctx, ((90 + drift * 0.45) % (W + 120)) - 60, 10, 18, 5)
+  // dot sun, top right
+  drawCloud(ctx, 168, 14, 8, 7)
   const horizon = 90
+  drawHills(ctx, horizon, 5)
   drawGround(ctx, horizon)
-  // tufts of dot grass
+  // tufts of dot grass + flowers
   ctx.fillStyle = INK
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 14; i++) {
     const gx = Math.round(hash(i, 3) * (W - 10)) + 5
     ctx.fillRect(gx, horizon - 2, 1, 2)
     ctx.fillRect(gx + 2, horizon - 1, 1, 1)
+  }
+  for (let i = 0; i < 5; i++) {
+    drawFlower(ctx, Math.round(hash(i, 21) * (W - 20)) + 10, horizon + Math.round(hash(i, 23) * 8), f + i * 3)
   }
   // critter and buddy both wander
   const mx = wander(f, 40, 120, 0.5)
@@ -157,6 +185,13 @@ function sceneMeadow(ctx: Ctx, f: number, blink: boolean): void {
 
 function sceneSurf(ctx: Ctx, f: number, blink: boolean): void {
   ctx.fillStyle = INK
+  // sun + gulls + a distant sail
+  drawCloud(ctx, 26, 16, 9, 8)
+  const g = f % 90
+  if (g < 60) drawBird(ctx, W - g * 2.4, 18 + Math.sin(g / 5) * 3, Math.floor(g / 3) % 2 === 0)
+  drawBird(ctx, 52 + Math.sin(f / 9) * 4, 30, Math.floor(f / 4) % 2 === 0)
+  for (let k = 0; k < 6; k++) ctx.fillRect(16 + k, 88 - k, 1, 1) // sail
+  ctx.fillRect(13, 89, 8, 1)
   // big swell peaking right of center: steep face on the left, long back
   const surface = (x: number): number => {
     const sigma = x < 146 ? 34 : 70
@@ -217,13 +252,28 @@ function sceneDisco(ctx: Ctx, f: number, blink: boolean): void {
       }
     }
   }
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < 26; i++) {
     if (hash(i, Math.floor(f / 3)) > 0.45) {
       ctx.fillRect(Math.round(hash(i, 7) * (W - 8)) + 4, Math.round(hash(i, 13) * 66) + 8, 1, 1)
     }
   }
+  // sweeping light beams from the ball
+  for (let b = 0; b < 3; b++) {
+    const ang = Math.PI / 2 + Math.sin(f / 24 + b * 2.1) * 0.7
+    for (let r = 18; r < 66; r += 4) {
+      const x = Math.round(bx + Math.cos(ang) * r)
+      const y = Math.round(by + Math.sin(ang) * r)
+      if (y < 92 && hash(x, y + b) < 0.55) ctx.fillRect(x, y, 1, 1)
+    }
+  }
   const floor = 94
   drawGround(ctx, floor, 0.28)
+  // dance floor tile corners
+  for (let x = 8; x < W - 8; x += 12) {
+    for (let y = floor + 2; y < H; y += 6) {
+      if ((x / 12 + y / 6) % 2 < 1) ctx.fillRect(x, y, 2, 1)
+    }
+  }
   // DJ critter behind the decks
   const bob = Math.floor(f / 3) % 2
   const sx = Math.round(W / 2 - 22)
@@ -281,8 +331,30 @@ function sceneGarden(ctx: Ctx, f: number, blink: boolean): void {
       for (let x = px - 7; x <= px + 7; x += 2) if (hash(x, y) < 0.6) ctx.fillRect(x, y, 1, 1)
     }
   }
+  // hanging shelf with books, right of the window
+  for (let x = 156; x < 184; x += 2) ctx.fillRect(x, 30, 1, 1)
+  ctx.fillRect(158, 22, 3, 8)
+  ctx.fillRect(163, 24, 3, 6)
+  ctx.fillRect(168, 21, 2, 9)
+  ctx.fillRect(173, 25, 4, 5)
+  // picture frame, left of the window
+  for (let x = 34; x <= 50; x += 2) {
+    ctx.fillRect(x, 20, 1, 1)
+    ctx.fillRect(x, 34, 1, 1)
+  }
+  for (let y = 20; y <= 34; y += 2) {
+    ctx.fillRect(34, y, 1, 1)
+    ctx.fillRect(50, y, 1, 1)
+  }
+  drawCloud(ctx, 42, 27, 4, 3)
   const horizon = 92
   drawGround(ctx, horizon, 0.26)
+  // rug under the critter
+  ctx.fillStyle = INK
+  for (let x = 52; x < 104; x += 3) {
+    ctx.fillRect(x, horizon + 4, 1, 1)
+    ctx.fillRect(x + 1, horizon + 8, 1, 1)
+  }
   // desk with a mug
   for (let x = 108; x < 152; x += 2) ctx.fillRect(x, horizon - 18, 1, 1)
   for (let y = horizon - 18; y < horizon; y += 2) {
@@ -329,12 +401,20 @@ function sceneGlobe(ctx: Ctx, f: number, blink: boolean): void {
       }
     }
   }
-  // orbiting satellite dot
+  // two orbiting satellites + a crescent moon
   const oa = f / 18
   ctx.fillRect(Math.round(cx + Math.cos(oa) * 84), Math.round(62 + Math.sin(oa) * 20), 2, 2)
+  ctx.fillRect(Math.round(cx + Math.cos(-oa * 1.4 + 2) * 92), Math.round(58 + Math.sin(-oa * 1.4 + 2) * 26), 1, 1)
+  for (let y = -6; y <= 6; y++) {
+    for (let x = -6; x <= 6; x++) {
+      const inMoon = x * x + y * y <= 36
+      const inBite = (x - 3) * (x - 3) + y * y <= 25
+      if (inMoon && !inBite && hash(x + 300, y) < 0.8) ctx.fillRect(24 + x, 16 + y, 1, 1)
+    }
+  }
   // stars
-  for (let i = 0; i < 14; i++) {
-    if (hash(i, Math.floor(f / 5)) > 0.4) {
+  for (let i = 0; i < 26; i++) {
+    if (hash(i, Math.floor(f / 5)) > 0.35) {
       ctx.fillRect(Math.round(hash(i, 3) * (W - 8)) + 4, Math.round(hash(i, 5) * 46) + 4, 1, 1)
     }
   }
@@ -350,20 +430,47 @@ function sceneGlobe(ctx: Ctx, f: number, blink: boolean): void {
 
 function sceneNight(ctx: Ctx, f: number, blink: boolean): void {
   ctx.fillStyle = INK
-  // twinkling stars + dot moon
-  for (let i = 0; i < 34; i++) {
-    if (hash(i, Math.floor(f / 6) + Math.floor(i / 7)) > 0.35) {
+  // dense twinkling starfield + a constellation
+  for (let i = 0; i < 56; i++) {
+    if (hash(i, Math.floor(f / 6) + Math.floor(i / 7)) > 0.3) {
       ctx.fillRect(Math.round(hash(i, 11) * (W - 8)) + 4, Math.round(hash(i, 17) * 62) + 4, 1, 1)
     }
   }
-  drawCloud(ctx, 152, 22, 11, 10)
+  const CONST = [[26, 14], [38, 20], [50, 12], [58, 24], [72, 18]]
+  for (let i = 0; i < CONST.length; i++) {
+    ctx.fillRect(CONST[i][0], CONST[i][1], 2, 2)
+    if (i > 0) {
+      const [ax, ay] = CONST[i - 1]
+      const [bx2, by2] = CONST[i]
+      for (let t = 0.2; t < 1; t += 0.25) {
+        ctx.fillRect(Math.round(ax + (bx2 - ax) * t), Math.round(ay + (by2 - ay) * t), 1, 1)
+      }
+    }
+  }
+  // moon with craters
+  drawCloud(ctx, 152, 22, 12, 11)
+  ctx.fillStyle = '#1e1e1e'
+  ctx.fillRect(148, 18, 3, 3)
+  ctx.fillRect(156, 26, 2, 2)
+  ctx.fillStyle = INK
   // shooting star every ~9s
   const t = f % 108
   if (t < 10) {
     for (let k = 0; k < 5; k++) ctx.fillRect(20 + t * 6 - k * 3, 14 + t * 2 - k, 1, 1)
   }
   const horizon = 92
+  drawHills(ctx, horizon, 11)
   drawGround(ctx, horizon, 0.3)
+  // fireflies drifting low
+  for (let i = 0; i < 4; i++) {
+    if (hash(i, Math.floor(f / 4)) > 0.4) {
+      ctx.fillRect(
+        Math.round(wander(f, 20, W - 20, 0.4 + i * 0.13, i * 37)),
+        horizon - 16 + Math.round(Math.sin(f / 6 + i * 2) * 5),
+        1, 1
+      )
+    }
+  }
   // campfire: flicker + smoke
   const fx = 120
   ctx.fillStyle = BODY
@@ -381,6 +488,106 @@ function sceneNight(ctx: Ctx, f: number, blink: boolean): void {
 
 const SCENES = [sceneMeadow, sceneSurf, sceneGarden, sceneDisco, sceneGlobe, sceneNight]
 const DISCO = 3
+const TRANS_FRAMES = 32 // ~2.7s: dissolve → linked orb → scatter into next scene
+
+interface Particle {
+  sx: number; sy: number // start (pixel of outgoing scene)
+  tx: number; ty: number // target (pixel of incoming scene)
+  a: number; r: number; tilt: number // orbit params
+  color: string
+}
+
+// render a scene offscreen and sample up to n lit pixels (position + color)
+function samplePixels(scene: (ctx: Ctx, f: number, b: boolean) => void, f: number, n: number): { x: number; y: number; color: string }[] {
+  const off = document.createElement('canvas')
+  off.width = W
+  off.height = H
+  const octx = off.getContext('2d')!
+  scene(octx, f, false)
+  const img = octx.getImageData(0, 0, W, H).data
+  const lit: { x: number; y: number; color: string }[] = []
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4
+      if (img[i + 3] > 0) {
+        lit.push({ x, y, color: `rgb(${img[i]},${img[i + 1]},${img[i + 2]})` })
+      }
+    }
+  }
+  const step = Math.max(1, Math.floor(lit.length / n))
+  const out: { x: number; y: number; color: string }[] = []
+  for (let i = 0; i < lit.length && out.length < n; i += step) out.push(lit[i])
+  return out
+}
+
+function buildParticles(fromScene: number, toScene: number, fromF: number, toF: number): Particle[] {
+  const src = samplePixels(SCENES[fromScene], fromF, 300)
+  const dst = samplePixels(SCENES[toScene], toF, 300)
+  const count = Math.min(src.length, dst.length)
+  const parts: Particle[] = []
+  for (let i = 0; i < count; i++) {
+    const s = src[i]
+    const d = dst[(i * 7) % count] // shuffle pairings so paths cross
+    parts.push({
+      sx: s.x, sy: s.y, tx: d.x, ty: d.y,
+      a: hash(i, 1) * Math.PI * 2,
+      r: 18 + hash(i, 2) * 14,
+      tilt: 0.45 + hash(i, 3) * 0.25,
+      color: s.color
+    })
+  }
+  return parts
+}
+
+const ease = (t: number): number => 1 - Math.pow(1 - t, 3)
+
+function drawTransition(ctx: Ctx, parts: Particle[], t: number): void {
+  const cx = W / 2
+  const cy = 52
+  const spin = 2.6
+  const pos = (p: Particle): { x: number; y: number } => {
+    if (t < 0.35) {
+      // gather: scene pixels spiral in toward their orbit slot
+      const k = ease(t / 0.35)
+      const ox = cx + Math.cos(p.a) * p.r
+      const oy = cy + Math.sin(p.a) * p.r * p.tilt
+      return { x: p.sx + (ox - p.sx) * k, y: p.sy + (oy - p.sy) * k }
+    }
+    if (t < 0.68) {
+      // orbit: the orb spins as one body
+      const k = (t - 0.35) / 0.33
+      const a = p.a + k * spin
+      return { x: cx + Math.cos(a) * p.r, y: cy + Math.sin(a) * p.r * p.tilt }
+    }
+    // scatter: fly out to the incoming scene's pixels
+    const k = ease((t - 0.68) / 0.32)
+    const a = p.a + spin
+    const ox = cx + Math.cos(a) * p.r
+    const oy = cy + Math.sin(a) * p.r * p.tilt
+    return { x: ox + (p.tx - ox) * k, y: oy + (p.ty - oy) * k }
+  }
+  const pts: { x: number; y: number }[] = []
+  for (const p of parts) {
+    const q = pos(p)
+    pts.push(q)
+    ctx.fillStyle = p.color
+    ctx.fillRect(Math.round(q.x), Math.round(q.y), 1, 1)
+  }
+  // constellation links while the orb holds together
+  if (t >= 0.28 && t < 0.75) {
+    ctx.fillStyle = INK
+    for (let i = 0; i < pts.length; i += 9) {
+      const a = pts[i]
+      const b = pts[(i + 4) % pts.length]
+      const dx = b.x - a.x
+      const dy = b.y - a.y
+      if (dx * dx + dy * dy > 26 * 26) continue
+      for (let s = 0.25; s < 1; s += 0.25) {
+        ctx.fillRect(Math.round(a.x + dx * s), Math.round(a.y + dy * s), 1, 1)
+      }
+    }
+  }
+}
 
 export function CoreScene({ usagePercent, busy }: { usagePercent: number; busy: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -394,6 +601,7 @@ export function CoreScene({ usagePercent, busy }: { usagePercent: number; busy: 
     const canvas = ref.current!
     const ctx = canvas.getContext('2d')!
     let frame = 0
+    let parts: Particle[] | null = null
 
     const draw = (): void => {
       ctx.clearRect(0, 0, W, H)
@@ -401,16 +609,16 @@ export function CoreScene({ usagePercent, busy }: { usagePercent: number; busy: 
       const slot = Math.floor(frame / SCENE_FRAMES)
       const sceneIdx = busyRef.current ? DISCO : slot % SCENES.length
       const inScene = frame % SCENE_FRAMES
-      if (inScene < STATIC_FRAMES && !busyRef.current) {
-        ctx.fillStyle = INK
-        for (let i = 0; i < 420; i++) {
-          ctx.fillRect(
-            Math.round(hash(i, frame) * (W - 1)),
-            Math.round(hash(i + 500, frame) * (H - 1)),
-            1, 1
-          )
+      if (inScene < TRANS_FRAMES && slot > 0 && !busyRef.current) {
+        // pixels of the outgoing scene circulate into a linked orb, then
+        // scatter out as the incoming scene
+        if (inScene === 0 || !parts) {
+          const prev = (slot - 1) % SCENES.length
+          parts = buildParticles(prev, sceneIdx, frame - 1, frame + TRANS_FRAMES)
         }
+        drawTransition(ctx, parts, inScene / TRANS_FRAMES)
       } else {
+        parts = null
         const blinking = frame % blinkEvery >= blinkEvery - 6
         SCENES[sceneIdx](ctx, frame, blinking)
       }

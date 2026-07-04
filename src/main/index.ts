@@ -14,7 +14,7 @@ let tray: Tray
 function createHudWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1200, height: 720, minWidth: 1000, minHeight: 600,
-    backgroundColor: '#1e1e1e', title: 'VAULT',
+    backgroundColor: '#1e1e1e', title: 'vault',
     // sandbox off: electron-vite emits an ESM preload (.mjs), which sandboxed renderers can't load
     webPreferences: { preload: join(__dirname, '../preload/index.mjs'), sandbox: false, backgroundThrottling: false }
   })
@@ -60,7 +60,7 @@ app.whenReady().then(async () => {
 
   createHudWindow()
   const showHud = (): void => {
-    const w = BrowserWindow.getAllWindows().find((x) => x.getTitle() === 'VAULT')
+    const w = BrowserWindow.getAllWindows().find((x) => x.getTitle() === 'vault')
     if (w && !w.isDestroyed()) {
       w.show()
       w.focus()
