@@ -9,19 +9,19 @@
   font-display: swap;
 }
 
-/* Claude FM palette: cream paper, near-black ink, warm gray, clay reserved
-   for the mascot and live/danger states — nothing else gets color */
+/* Terminal palette: #1e1e1e ground (sampled from the user's terminal),
+   off-white ink, clay reserved for the mascot and live/danger states */
 :root {
-  --bg: #f4f2e9;
-  --panel: #f4f2e9;
-  --line: #17160f;
-  --line-soft: #dcd9ca;
-  --ink: #17160f;
-  --ink-dim: #8d8a7a;
-  --accent: #17160f;      /* accents are ink in this system */
-  --accent-dim: #8d8a7a;
+  --bg: #1e1e1e;
+  --panel: #1e1e1e;
+  --line: #e8e6e3;
+  --line-soft: #3a3a3a;
+  --ink: #e8e6e3;
+  --ink-dim: #8f8f8f;
+  --accent: #e8e6e3;      /* accents are ink in this system */
+  --accent-dim: #8f8f8f;
   --clay: #d97757;        /* the mascot's color — use sparingly */
-  --danger: #c1441e;
+  --danger: #ff6e4e;
   --font-pixel: 'Press Start 2P', monospace;
   --font-mono: 'Departure Mono', 'SF Mono', Menlo, monospace;
 }

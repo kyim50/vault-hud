@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 // critter. Everything ink-on-cream except the mascot itself.
 const W = 192
 const H = 108
-const INK = '#17160f'
+const INK = '#e8e6e3'
 const BODY = '#d97757'
 const DARK = '#b85c3f'
 const EYE = '#17160f'

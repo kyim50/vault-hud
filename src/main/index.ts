@@ -14,7 +14,7 @@ let tray: Tray
 function createHudWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1200, height: 720, minWidth: 1000, minHeight: 600,
-    backgroundColor: '#f4f2e9', title: 'V.A.U.L.T.',
+    backgroundColor: '#1e1e1e', title: 'V.A.U.L.T.',
     // sandbox off: electron-vite emits an ESM preload (.mjs), which sandboxed renderers can't load
     webPreferences: { preload: join(__dirname, '../preload/index.mjs'), sandbox: false }
   })
