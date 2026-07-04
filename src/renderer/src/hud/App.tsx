@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useSnapshot } from '../lib/useSnapshot'
 import { Panel } from '../components/Panel'
 import { VitalsPanel } from '../components/VitalsPanel'
@@ -11,14 +12,19 @@ import { CoreScene } from '../components/CoreScene'
 import { Parade } from '../components/Parade'
 import { SkillsPanel } from '../components/SkillsPanel'
 import { PetBox } from '../components/PetBox'
+import { SettingsPanel } from '../components/SettingsPanel'
 
 export default function App() {
   const snap = useSnapshot()
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  useEffect(() => {
+    if (snap) document.body.dataset.theme = snap.ui.theme
+  }, [snap?.ui.theme])
   if (!snap) return <p style={{ padding: 16 }}>booting…</p>
   return (
     <>
-    <Parade />
-    <PetBox name={snap.pet.name} xp={snap.pet.xp} busy={snap.commands.some((c) => c.status.state === 'running')} />
+    <Parade enabled={snap.ui.parade} sprites={snap.sprites.filter((sp) => sp.use === 'parade')} />
+    <PetBox name={snap.pet.name} xp={snap.pet.xp} busy={snap.commands.some((c) => c.status.state === 'running')} skin={snap.sprites.find((sp) => sp.use === 'pet')?.grid} />
     <div
       style={{
         display: 'grid',
@@ -48,7 +54,17 @@ export default function App() {
             {snap.repos.filter((r) => r.branch !== '—').length}/{snap.repos.length}
           </span>
         </div>
-        <Clock />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span
+            onClick={() => setSettingsOpen(true)}
+            title="settings"
+            style={{ cursor: 'pointer', fontFamily: 'var(--font-pixel)', fontSize: 10 }}
+            className="dim"
+          >
+            ⚙
+          </span>
+          <Clock />
+        </div>
       </header>
       {snap.configCreated && (
         <div
@@ -83,6 +99,7 @@ export default function App() {
         <SkillsPanel skills={snap.skills} />
       </div>
     </div>
+    {settingsOpen && <SettingsPanel snap={snap} onClose={() => setSettingsOpen(false)} />}
     </>
   )
 }

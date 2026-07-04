@@ -23,6 +23,8 @@ export class HudState extends EventEmitter {
       docs: [], skills: [], directives: [], schedule: [], commands: [],
       primary: { label: config.primaryDirective.label, value: 0, target: config.primaryDirective.target, unit: config.primaryDirective.unit },
       pet: { ...config.pet },
+      ui: { ...config.ui },
+      sprites: [],
       generatedAt: 0,
       configCreated,
       configPath
@@ -74,6 +76,7 @@ export class HudState extends EventEmitter {
   private publish(): void {
     this.snapshot.commands = this.runner.list()
     this.snapshot.pet = { ...this.config.pet }
+    this.snapshot.ui = { ...this.config.ui }
     this.snapshot.generatedAt = Date.now()
     this.emit('snapshot', this.snapshot)
   }

@@ -33,7 +33,8 @@ export function buildDefaultConfig(opts: {
       unit: 'commits',
       source: 'commitsThisWeek'
     },
-    pet: { name: 'pip', xp: 0 }
+    pet: { name: 'pip', xp: 0 },
+    ui: { theme: 'terminal', parade: true }
   }
 }
 
@@ -53,7 +54,8 @@ export function mergeConfig(partial: unknown, defaults: VaultHudConfig): VaultHu
       ...defaults.primaryDirective,
       ...(isPlainObject(p.primaryDirective) ? p.primaryDirective : {})
     },
-    pet: { ...defaults.pet, ...(isPlainObject(p.pet) ? p.pet : {}) }
+    pet: { ...defaults.pet, ...(isPlainObject(p.pet) ? p.pet : {}) },
+    ui: { ...defaults.ui, ...(isPlainObject(p.ui) ? p.ui : {}) }
   }
 }
 

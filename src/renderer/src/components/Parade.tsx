@@ -16,7 +16,8 @@ const BUDDY = [
 ]
 
 interface Walker {
-  kind: 'buddy' | 'bird' | 'snail'
+  kind: 'buddy' | 'bird' | 'snail' | 'custom'
+  grid?: string[][]
   x: number
   dir: 1 | -1
   speed: number
@@ -28,8 +29,12 @@ function h(x: number, y: number): number {
   return ((v ^ (v >> 16)) >>> 0) / 4294967296
 }
 
-export function Parade() {
+export function Parade({ enabled, sprites }: { enabled: boolean; sprites: { name: string; grid: string[][] }[] }) {
   const ref = useRef<HTMLCanvasElement>(null)
+  const spritesRef = useRef(sprites)
+  spritesRef.current = sprites
+  const enabledRef = useRef(enabled)
+  enabledRef.current = enabled
   useEffect(() => {
     const canvas = ref.current!
     const fit = (): void => {
@@ -44,18 +49,25 @@ export function Parade() {
 
     const spawn = (): void => {
       const roll = h(frame, 42)
-      const kind = roll < 0.5 ? 'buddy' : roll < 0.8 ? 'bird' : 'snail'
+      const hasCustom = spritesRef.current.length > 0
+      const kind = hasCustom && roll < 0.3 ? 'custom' : roll < 0.55 ? 'buddy' : roll < 0.82 ? 'bird' : 'snail'
       const dir = h(frame, 7) < 0.5 ? 1 : -1
+      const grid = kind === 'custom' ? spritesRef.current[Math.floor(h(frame, 11) * spritesRef.current.length)].grid : undefined
       walkers.push({
         kind,
-        x: dir === 1 ? -20 : canvas.width + 20,
+        grid,
+        x: dir === 1 ? -30 : canvas.width + 30,
         dir: dir as 1 | -1,
-        speed: kind === 'bird' ? 2.4 : kind === 'snail' ? 0.35 : 1.1
+        speed: kind === 'bird' ? 2.4 : kind === 'snail' ? 0.35 : kind === 'custom' ? 0.9 : 1.1
       })
     }
 
     const draw = (): void => {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
+      if (!enabledRef.current) {
+        frame++
+        return
+      }
       // every ~25-45s, someone strolls by (keep at most 2 on screen)
       if (walkers.length < 2 && frame % (300 + Math.floor(h(Math.floor(frame / 300), 3) * 240)) === 299) spawn()
       for (let i = walkers.length - 1; i >= 0; i--) {
@@ -66,7 +78,20 @@ export function Parade() {
           continue
         }
         const x = Math.round(w.x)
-        if (w.kind === 'bird') {
+        if (w.kind === 'custom' && w.grid) {
+          // shrink custom sprites to fit the strip (max 14px tall)
+          const gh = w.grid.length
+          const step = Math.max(1, Math.ceil(gh / 14))
+          const bob = Math.floor(frame / 4) % 2
+          for (let r = 0; r < gh; r += step) {
+            for (let c = 0; c < w.grid[r].length; c += step) {
+              const col = w.grid[r][c]
+              if (!col) continue
+              ctx.fillStyle = col
+              ctx.fillRect(x + Math.floor(c / step), 1 + bob + Math.floor(r / step), 1, 1)
+            }
+          }
+        } else if (w.kind === 'bird') {
           const flap = Math.floor(frame / 3) % 2 === 0
           ctx.fillStyle = INK
           const y = 7 + Math.round(Math.sin(frame / 5) * 2)

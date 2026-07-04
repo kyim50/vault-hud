@@ -26,6 +26,18 @@
   --font-mono: 'Departure Mono', 'SF Mono', Menlo, monospace;
 }
 
+/* paper theme: the original Claude FM cream, switchable in settings */
+body[data-theme='paper'] {
+  --bg: #f4f2e9;
+  --panel: #f4f2e9;
+  --line: #17160f;
+  --line-soft: #dcd9ca;
+  --ink: #17160f;
+  --ink-dim: #8d8a7a;
+  --accent: #17160f;
+  --accent-dim: #8d8a7a;
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {

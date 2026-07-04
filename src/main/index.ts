@@ -1,8 +1,9 @@
 import { app, BrowserWindow, ipcMain, shell, Tray } from 'electron'
 import { join } from 'node:path'
 import { IPC } from '@shared/ipc'
-import type { Directive } from '@shared/types'
+import type { CustomSprite, Directive, RepoConfig, VaultHudConfig } from '@shared/types'
 import { loadOrCreateConfig, saveConfig, CONFIG_PATH } from './config'
+import { loadSprites, saveSprite as persistSprite, deleteSprite as removeSprite } from './sprites'
 import { HudState } from './state'
 import { setDirectiveDone } from './collectors/vault'
 import { setupTray } from './tray'
@@ -57,6 +58,7 @@ app.whenReady().then(async () => {
     ? join(process.resourcesPath, 'commands')
     : join(app.getAppPath(), 'commands')
   state = new HudState(config, commandsDir, created, CONFIG_PATH)
+  state.snapshot.sprites = await loadSprites()
   state.on('snapshot', broadcast)
 
   ipcMain.handle(IPC.getSnapshot, () => state.snapshot)
@@ -71,6 +73,33 @@ app.whenReady().then(async () => {
       await state.refreshVault()
     } catch (e) {
       console.error('vault-hud: toggleDirective failed', e)
+    }
+  })
+  ipcMain.on(IPC.updateConfig, async (_e, patch: { ui?: Partial<VaultHudConfig['ui']>; petName?: string; repos?: RepoConfig[] }) => {
+    try {
+      if (patch.ui) Object.assign(config.ui, patch.ui)
+      if (typeof patch.petName === 'string' && patch.petName.trim()) config.pet.name = patch.petName.trim().slice(0, 12)
+      if (Array.isArray(patch.repos)) config.repos = patch.repos
+      await saveConfig(config)
+      await state.refreshAll()
+    } catch (e) {
+      console.error('vault-hud: updateConfig failed', e)
+    }
+  })
+  ipcMain.on(IPC.saveSprite, async (_e, sprite: CustomSprite) => {
+    try {
+      state.snapshot.sprites = await persistSprite(state.snapshot.sprites, sprite)
+      await state.refreshVault()
+    } catch (e) {
+      console.error('vault-hud: saveSprite failed', e)
+    }
+  })
+  ipcMain.on(IPC.deleteSprite, async (_e, name: string) => {
+    try {
+      state.snapshot.sprites = await removeSprite(state.snapshot.sprites, name)
+      await state.refreshVault()
+    } catch (e) {
+      console.error('vault-hud: deleteSprite failed', e)
     }
   })
   ipcMain.on(IPC.openDoc, (_e, relPath: string) => {

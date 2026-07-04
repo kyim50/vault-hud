@@ -17,6 +17,13 @@ export interface VaultHudConfig {
     manualValue?: number
   }
   pet: { name: string; xp: number }
+  ui: { theme: 'terminal' | 'paper'; parade: boolean }
+}
+
+export interface CustomSprite {
+  name: string
+  grid: string[][] // rows of hex colors; '' = transparent
+  use: 'parade' | 'pet' | 'none'
 }
 
 export interface RepoStats {
@@ -82,6 +89,8 @@ export interface HudSnapshot {
   commands: { info: CommandInfo; status: CommandStatus }[]
   primary: { label: string; value: number; target: number; unit: string }
   pet: { name: string; xp: number }
+  ui: { theme: 'terminal' | 'paper'; parade: boolean }
+  sprites: CustomSprite[]
   generatedAt: number
   configCreated: boolean
   configPath: string

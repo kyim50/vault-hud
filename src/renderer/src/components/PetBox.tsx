@@ -17,7 +17,9 @@ const PET = [
   '.L.LL.L.'
 ]
 
-export function PetBox({ name, xp, busy }: { name: string; xp: number; busy: boolean }) {
+export function PetBox({ name, xp, busy, skin }: { name: string; xp: number; busy: boolean; skin?: string[][] }) {
+  const skinRef = useRef(skin)
+  skinRef.current = skin
   const ref = useRef<HTMLCanvasElement>(null)
   const busyRef = useRef(busy)
   busyRef.current = busy
@@ -43,6 +45,21 @@ export function PetBox({ name, xp, busy }: { name: string; xp: number; busy: boo
       const bounce = dancing ? (Math.floor(f / 2) % 2 === 0 ? -3 : 0) : (Math.floor(f / 8) % 2)
       const px = 24 + (dancing ? Math.round(Math.sin(f / 3) * 4) : 0)
       const py = (asleep ? 24 : 21) + bounce
+      const sk = skinRef.current
+      if (sk) {
+        // custom skin: draw scaled to ~24px wide, bobbing
+        const step = Math.max(1, Math.ceil(sk.length / 26))
+        for (let r = 0; r < sk.length; r += step) {
+          for (let c = 0; c < sk[r].length; c += step) {
+            const col = sk[r][c]
+            if (!col) continue
+            ctx.fillStyle = col
+            ctx.fillRect(20 + Math.floor(c / step), 8 + bounce + Math.floor(r / step), 1, 1)
+          }
+        }
+        f++
+        return
+      }
       for (let r = 0; r < PET.length; r++) {
         for (let c = 0; c < PET[r].length; c++) {
           const ch = PET[r][c]
