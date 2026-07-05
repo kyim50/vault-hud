@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import type { HudSnapshot } from '@shared/types'
 import { Panel } from './Panel'
-import { PANDA, DEFAULT_PALETTE } from '../lib/panda'
+import { PANDA_MINI, DEFAULT_PALETTE } from '../lib/panda'
 import { spriteToHalfBlocks } from '../lib/blockart'
 import { fetchLines, type FetchLineId } from '../lib/fetchLines'
 
@@ -45,16 +45,16 @@ export function VaultfetchPanel({ snap, opts }: { snap: HudSnapshot; opts: Fetch
     return () => clearInterval(t)
   }, [opts.quoteRotateSec, snap.quotes.length])
 
-  const logo = spriteToHalfBlocks(PANDA, DEFAULT_PALETTE)
+  const logo = spriteToHalfBlocks(PANDA_MINI, DEFAULT_PALETTE)
   const lines = fetchLines(snap, Date.now(), opts.lines)
   const quote = snap.quotes[qi % Math.max(1, snap.quotes.length)] ?? ''
   const header = `${snap.pet.name}@${snap.appName}`
 
   return (
     <Panel title="◈ VAULTFETCH">
-      <div style={{ display: 'flex', gap: 12, fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1 }}>
+      <div style={{ display: 'flex', gap: 10, fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1, overflow: 'hidden' }}>
         {opts.showLogo && (
-          <div style={{ lineHeight: '0.62em', letterSpacing: 0, whiteSpace: 'pre' }}>
+          <div style={{ lineHeight: '0.62em', letterSpacing: 0, whiteSpace: 'pre', flexShrink: 0 }}>
             {logo.map((row, y) => (
               <div key={y} style={{ display: 'flex' }}>
                 {row.map((c, x) => (
@@ -66,13 +66,13 @@ export function VaultfetchPanel({ snap, opts }: { snap: HudSnapshot; opts: Fetch
             ))}
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 8, rowGap: 2, alignContent: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 8, rowGap: 2, alignContent: 'start', minWidth: 0 }}>
           <div className="clay" style={{ gridColumn: '1 / -1' }}>{header}</div>
           <div className="dim" style={{ gridColumn: '1 / -1', borderBottom: '1px solid var(--line)', marginBottom: 2 }} />
           {lines.map((l) => (
             <Fragment key={l.id}>
               <span className="dim">{l.label}</span>
-              <span>{l.value}</span>
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.value}</span>
             </Fragment>
           ))}
         </div>
