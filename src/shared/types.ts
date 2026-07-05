@@ -50,6 +50,13 @@ export interface ModuleConfig {
   options?: Record<string, unknown>
 }
 
+export interface SceneConfig {
+  rotation?: string[] // scenes that cycle, in order
+  intervalSec?: number // seconds per scene
+  busy?: string // scene shown while a command runs
+  nap?: string // scene shown after 90min idle
+}
+
 export type Density = 'compact' | 'cozy' | 'airy'
 export interface ThemeColors {
   bg?: string
@@ -85,6 +92,7 @@ export interface UiConfig {
   audio?: AudioConfig
   modules?: Record<string, ModuleConfig> // per-module rice slice: enable + options
   themes?: Record<string, ThemeDef> // inline user themes (folder themes merge over these)
+  scenes?: SceneConfig
 }
 
 export interface CustomSprite {
