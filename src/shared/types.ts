@@ -104,6 +104,14 @@ export interface UiConfig {
   geometry?: GeometryConfig
 }
 
+// A self-contained shareable "rice": the whole look in one JSON.
+export interface RiceBundle {
+  v: 1
+  ui: UiConfig
+  themes?: Record<string, ThemeDef> // embedded theme defs so a recipient needs no theme files
+  sprites?: CustomSprite[]
+}
+
 export interface CustomSprite {
   name: string
   grid: string[][] // rows of hex colors; '' = transparent
