@@ -3,12 +3,23 @@ export interface RepoConfig {
   path: string
 }
 
+// ai provider matrix: cloud providers track token windows, ollama runs
+// local and is metered by CPU load instead
+export type Provider = 'anthropic' | 'openai' | 'ollama'
+
+export interface AiConfig {
+  provider: Provider
+  windowHours: number
+  windowTokenLimit: number
+  ollamaModel: string
+}
+
 export interface VaultHudConfig {
   appName: string
-  vaultPath: string
+  vaultPath: string // any folder of plain .md files — no app lock-in
   dashboardFolder: string // relative to vaultPath, e.g. "Dashboard"
   repos: RepoConfig[]
-  claude: { windowHours: number; windowTokenLimit: number }
+  ai: AiConfig
   primaryDirective: {
     label: string
     target: number
@@ -17,13 +28,36 @@ export interface VaultHudConfig {
     manualValue?: number
   }
   pet: { name: string; xp: number }
-  ui: { theme: 'terminal' | 'paper'; parade: boolean }
+  loot: string[] // accessory props the panda has earned
+  ui: UiConfig
+}
+
+// panel ids for the two side columns, in display order (drag to rearrange)
+export interface PanelLayout {
+  left: string[]
+  right: string[]
+}
+
+export type AudioMode = 'off' | 'hum' | 'hiss'
+
+export interface AudioConfig {
+  mode: AudioMode
+  volume: number // 0-100
+}
+
+export interface UiConfig {
+  theme: 'terminal' | 'paper'
+  parade: boolean // critters patrol the HUD frame
+  layout?: PanelLayout
+  audio?: AudioConfig
 }
 
 export interface CustomSprite {
   name: string
   grid: string[][] // rows of hex colors; '' = transparent
-  use: 'parade' | 'pet' | 'none'
+  // frame: patrols the HUD border · totem: displayed big in the Totem panel
+  // (legacy 'parade' → 'frame' and 'pet' → 'totem' migrate on load)
+  use: 'frame' | 'totem' | 'none'
 }
 
 export interface RepoStats {
@@ -37,9 +71,13 @@ export interface RepoStats {
   daily: number[] // 7 buckets, oldest first
 }
 
-export interface ClaudeUsage {
+// provider-aware metrics: cloud = token window, local = cpu load
+export interface UsageStats {
+  provider: Provider
+  mode: 'tokens' | 'cpu'
   windowTokens: number
   percent: number
+  cores?: number // set in cpu mode
   updatedAt: number
 }
 
@@ -55,11 +93,25 @@ export interface Directive {
   done: boolean
   line: number
   file: string
+  due?: string // YYYY-MM-DD when detectable (filename, inline tag, frontmatter)
 }
 
 export interface ScheduleItem {
   time: string
   text: string
+}
+
+// bi-directional wiki-link graph over the markdown workspace
+export interface GraphNode {
+  title: string
+  relPath: string
+  mtime: number
+  links: number // degree — used for star brightness
+}
+
+export interface LinkGraph {
+  nodes: GraphNode[]
+  edges: [number, number][] // indices into nodes
 }
 
 export type CommandState = 'idle' | 'queued' | 'running' | 'done' | 'failed'
@@ -78,10 +130,12 @@ export interface CommandStatus {
   log?: string
 }
 
+export type Mood = 'happy' | 'napping'
+
 export interface HudSnapshot {
   appName: string
   repos: RepoStats[]
-  usage: ClaudeUsage
+  usage: UsageStats
   docs: VaultDoc[]
   skills: VaultDoc[]
   directives: Directive[]
@@ -89,7 +143,10 @@ export interface HudSnapshot {
   commands: { info: CommandInfo; status: CommandStatus }[]
   primary: { label: string; value: number; target: number; unit: string }
   pet: { name: string; xp: number }
-  ui: { theme: 'terminal' | 'paper'; parade: boolean }
+  mood: Mood // napping = files churning but nothing checked off in 90min
+  loot: string[]
+  graph: LinkGraph
+  ui: UiConfig
   sprites: CustomSprite[]
   brain: { recent: VaultDoc[]; resurfaced: VaultDoc | null }
   generatedAt: number

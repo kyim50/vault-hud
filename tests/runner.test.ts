@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { CommandRunner } from '../src/main/commands/runner'
+import { buildAgentInvocation, CommandRunner } from '../src/main/commands/runner'
 import { buildDefaultConfig } from '../src/main/config'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -13,6 +13,24 @@ function makeCommandsDir(): string {
 }
 
 const config = buildDefaultConfig({ home: '/u', vaultPath: '/v', repoDirs: [] })
+
+describe('buildAgentInvocation', () => {
+  const ai = { windowHours: 5, windowTokenLimit: 1, ollamaModel: 'llama3.2' }
+  it('routes to the active provider CLI', () => {
+    expect(buildAgentInvocation({ ...ai, provider: 'anthropic' }, 'p', 'Read')).toEqual({
+      bin: 'claude',
+      args: ['-p', 'p', '--output-format', 'text', '--allowedTools', 'Read']
+    })
+    expect(buildAgentInvocation({ ...ai, provider: 'openai' }, 'p', 'Read')).toEqual({
+      bin: 'codex',
+      args: ['exec', 'p']
+    })
+    expect(buildAgentInvocation({ ...ai, provider: 'ollama' }, 'p', '')).toEqual({
+      bin: 'ollama',
+      args: ['run', 'llama3.2', 'p']
+    })
+  })
+})
 
 describe('CommandRunner', () => {
   it('loads commands and reports idle statuses', async () => {

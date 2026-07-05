@@ -21,7 +21,8 @@ export const NOTCH_WIDTH = 440
 export function createNotchWindow(): BrowserWindow {
   const display = screen.getPrimaryDisplay()
   const m = menuBarHeight()
-  const size = { width: NOTCH_WIDTH, height: m + 122 }
+  // +18 hosts the multi-provider toggle bar at the island's foot
+  const size = { width: NOTCH_WIDTH, height: m + 140 }
   const win = new BrowserWindow({
     ...size,
     x: Math.round(display.bounds.x + display.bounds.width / 2 - size.width / 2),
@@ -42,6 +43,21 @@ export function createNotchWindow(): BrowserWindow {
   // butt up against (and visually continue) the physical notch
   win.setAlwaysOnTop(true, 'pop-up-menu', 1)
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  // macOS clamps the window below the menu bar at creation (the level is
+  // still 'normal' then), and raising the level does NOT move it back —
+  // bounds must be re-applied AFTER setAlwaysOnTop to truly hug the notch
+  const pin = (): void => {
+    const d = screen.getPrimaryDisplay()
+    win.setBounds({
+      x: Math.round(d.bounds.x + d.bounds.width / 2 - size.width / 2),
+      y: d.bounds.y,
+      ...size
+    })
+  }
+  pin()
+  // resolution / display changes re-clamp the window: pin it again
+  screen.on('display-metrics-changed', pin)
+  win.on('closed', () => screen.removeListener('display-metrics-changed', pin))
   // start dormant: clicks pass through, but moves are forwarded to the page
   win.setIgnoreMouseEvents(true, { forward: true })
   const url = `notch.html#mh=${m}`

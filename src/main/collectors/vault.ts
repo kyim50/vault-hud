@@ -1,7 +1,8 @@
 import { promises as fs } from 'node:fs'
-import { join, relative, resolve, sep } from 'node:path'
-import type { Directive, ScheduleItem, VaultDoc, VaultHudConfig } from '@shared/types'
+import { basename, join, relative, resolve, sep } from 'node:path'
+import type { Directive, LinkGraph, ScheduleItem, VaultDoc, VaultHudConfig } from '@shared/types'
 import { localDateStamp, parseDirectives, parseSchedule, planFileName, toggleDirectiveLine } from './vaultNotes'
+import { buildLinkGraph, extractTasks, extractWikiLinks, type ScannedNote } from './markdown'
 
 function dashboardDir(config: VaultHudConfig): string {
   return join(config.vaultPath, config.dashboardFolder)
@@ -56,12 +57,23 @@ async function listSkills(config: VaultHudConfig): Promise<VaultDoc[]> {
 }
 
 const SKIP_DIRS = new Set(['.obsidian', '.trash', 'node_modules', '.git'])
+const MAX_NOTES = 500
+const MAX_CONTENT_READS = 300
+const MAX_FILE_BYTES = 128 * 1024
 
-// whole-vault note scan: shallow-ish, capped, fail-soft — powers Second Brain
-async function listVaultNotes(config: VaultHudConfig): Promise<VaultDoc[]> {
+interface WorkspaceScan {
+  notes: VaultDoc[]
+  graph: LinkGraph
+  tasks: Directive[]
+}
+
+// whole-workspace scan over any folder of plain .md files: recent notes for
+// Second Brain, GFM tasks with natural deadlines, and the wiki-link graph.
+// Shallow-ish, capped, fail-soft — no app-specific format required.
+async function scanWorkspace(config: VaultHudConfig): Promise<WorkspaceScan> {
   const notes: VaultDoc[] = []
   async function walk(dir: string, depth: number): Promise<void> {
-    if (depth > 4 || notes.length >= 500) return
+    if (depth > 4 || notes.length >= MAX_NOTES) return
     let entries
     try {
       entries = await fs.readdir(dir, { withFileTypes: true })
@@ -69,7 +81,7 @@ async function listVaultNotes(config: VaultHudConfig): Promise<VaultDoc[]> {
       return
     }
     for (const e of entries) {
-      if (notes.length >= 500) return
+      if (notes.length >= MAX_NOTES) return
       const full = join(dir, e.name)
       if (e.isDirectory()) {
         if (!SKIP_DIRS.has(e.name)) await walk(full, depth + 1)
@@ -89,7 +101,28 @@ async function listVaultNotes(config: VaultHudConfig): Promise<VaultDoc[]> {
     }
   }
   await walk(config.vaultPath, 0)
-  return notes.sort((a, b) => b.mtime - a.mtime)
+  notes.sort((a, b) => b.mtime - a.mtime)
+
+  // read contents newest-first (capped) for links + tasks
+  const scanned: ScannedNote[] = []
+  const tasks: Directive[] = []
+  const today = localDateStamp(new Date())
+  for (const n of notes.slice(0, MAX_CONTENT_READS)) {
+    try {
+      const full = join(config.vaultPath, n.relPath)
+      const stat = await fs.stat(full)
+      if (stat.size > MAX_FILE_BYTES) {
+        scanned.push({ title: n.title, relPath: n.relPath, mtime: n.mtime, links: [] })
+        continue
+      }
+      const md = await fs.readFile(full, 'utf8')
+      scanned.push({ title: n.title, relPath: n.relPath, mtime: n.mtime, links: extractWikiLinks(md) })
+      tasks.push(...extractTasks(md, n.relPath, { fileName: basename(n.relPath), mtime: n.mtime, today }))
+    } catch {
+      /* fail soft per file */
+    }
+  }
+  return { notes, graph: buildLinkGraph(scanned), tasks }
 }
 
 // deterministic daily pick from notes untouched for 14+ days
@@ -115,24 +148,37 @@ export async function appendCapture(config: VaultHudConfig, text: string): Promi
   }
 }
 
+// with no dedicated plan file, surface workspace tasks that matter today:
+// anything due today or overdue, open ones first, freshest files first
+export function fallbackDirectives(tasks: Directive[], today: string, cap = 14): Directive[] {
+  const relevant = tasks.filter((t) => t.due && t.due <= today)
+  relevant.sort((a, b) => Number(a.done) - Number(b.done) || (b.due ?? '').localeCompare(a.due ?? ''))
+  return relevant.slice(0, cap)
+}
+
 export async function collectVaultData(config: VaultHudConfig): Promise<{
   docs: VaultDoc[]
   skills: VaultDoc[]
   directives: Directive[]
   schedule: ScheduleItem[]
   brain: { recent: VaultDoc[]; resurfaced: VaultDoc | null }
+  graph: LinkGraph
 }> {
-  if (!config.vaultPath) return { docs: [], skills: [], directives: [], schedule: [], brain: { recent: [], resurfaced: null } }
+  if (!config.vaultPath)
+    return { docs: [], skills: [], directives: [], schedule: [], brain: { recent: [], resurfaced: null }, graph: { nodes: [], edges: [] } }
   const allDocs = await listDocs(config).catch(() => [] as VaultDoc[])
   const docs = allDocs.slice(0, 12)
+  const scan = await scanWorkspace(config).catch(() => ({ notes: [] as VaultDoc[], graph: { nodes: [], edges: [] } as LinkGraph, tasks: [] as Directive[] }))
 
+  // a dated plan file wins when present; otherwise fall back to natural
+  // GFM tasks found anywhere in the workspace — zero required format
   let directives: Directive[] = []
   const planRel = join(config.dashboardFolder, 'Plans', planFileName(new Date()))
   try {
     const md = await fs.readFile(join(config.vaultPath, planRel), 'utf8')
     directives = parseDirectives(md, planRel)
   } catch {
-    /* no plan today */
+    directives = fallbackDirectives(scan.tasks, localDateStamp(new Date()))
   }
 
   let schedule: ScheduleItem[] = []
@@ -145,12 +191,11 @@ export async function collectVaultData(config: VaultHudConfig): Promise<{
     }
   }
   const skills = await listSkills(config)
-  const notes = await listVaultNotes(config).catch(() => [] as VaultDoc[])
   const brain = {
-    recent: notes.slice(0, 6),
-    resurfaced: pickResurfaced(notes, localDateStamp(new Date()), Date.now())
+    recent: scan.notes.slice(0, 6),
+    resurfaced: pickResurfaced(scan.notes, localDateStamp(new Date()), Date.now())
   }
-  return { docs, skills, directives, schedule, brain }
+  return { docs, skills, directives, schedule, brain, graph: scan.graph }
 }
 
 export async function setDirectiveDone(

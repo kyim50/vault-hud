@@ -9,8 +9,13 @@ function age(mtime: number): string {
   return `${Math.floor(m / 1440)}d`
 }
 
-// Whole-vault view: quick capture straight into Inbox.md, the freshest
-// notes anywhere in the vault, and one resurfaced note from the archive.
+// Whole-workspace view: quick capture straight into Inbox.md, the freshest
+// notes anywhere in the folder, and one resurfaced note from the archive.
+// Hovering a note asks the Core canvas to reveal the constellation graph.
+export function reveal(relPath: string | null): void {
+  window.dispatchEvent(new CustomEvent('vault:constellation', { detail: relPath }))
+}
+
 export function SecondBrainPanel({ recent, resurfaced }: { recent: VaultDoc[]; resurfaced: VaultDoc | null }) {
   const [text, setText] = useState('')
   const [sent, setSent] = useState(false)
@@ -42,6 +47,8 @@ export function SecondBrainPanel({ recent, resurfaced }: { recent: VaultDoc[]; r
         <div
           key={d.relPath}
           onClick={() => window.vault.openDoc(d.relPath)}
+          onMouseEnter={() => reveal(d.relPath)}
+          onMouseLeave={() => reveal(null)}
           style={{ display: 'flex', justifyContent: 'space-between', cursor: 'pointer', gap: 8 }}
         >
           <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.title}</span>
@@ -52,6 +59,8 @@ export function SecondBrainPanel({ recent, resurfaced }: { recent: VaultDoc[]; r
       {resurfaced && (
         <div
           onClick={() => window.vault.openDoc(resurfaced.relPath)}
+          onMouseEnter={() => reveal(resurfaced.relPath)}
+          onMouseLeave={() => reveal(null)}
           style={{ borderTop: '1px dotted var(--line-soft)', paddingTop: 5, cursor: 'pointer' }}
           title="a note you haven't touched in a while"
         >

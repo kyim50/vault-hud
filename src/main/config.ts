@@ -26,7 +26,7 @@ export function buildDefaultConfig(opts: {
     vaultPath: opts.vaultPath ?? '',
     dashboardFolder: 'Dashboard',
     repos: opts.repoDirs.map((p) => ({ name: basename(p), path: p })),
-    claude: { windowHours: 5, windowTokenLimit: 2_000_000 },
+    ai: { provider: 'anthropic', windowHours: 5, windowTokenLimit: 2_000_000, ollamaModel: 'llama3.2' },
     primaryDirective: {
       label: 'COMMITS THIS WEEK',
       target: 30,
@@ -34,7 +34,8 @@ export function buildDefaultConfig(opts: {
       source: 'commitsThisWeek'
     },
     pet: { name: 'pip', xp: 0 },
-    ui: { theme: 'terminal', parade: true }
+    loot: [],
+    ui: { theme: 'terminal', parade: true, audio: { mode: 'off', volume: 40 } }
   }
 }
 
@@ -44,19 +45,29 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 export function mergeConfig(partial: unknown, defaults: VaultHudConfig): VaultHudConfig {
   if (!isPlainObject(partial)) return defaults
-  const p = partial as Partial<VaultHudConfig>
-  return {
+  const p = partial as Partial<VaultHudConfig> & { claude?: { windowHours?: number; windowTokenLimit?: number } }
+  // configs written before the provider matrix kept limits under a `claude`
+  // key — fold it into `ai` so old installs keep their tuned limits
+  const legacyAi: { windowHours?: number; windowTokenLimit?: number } = {}
+  if (isPlainObject(p.claude)) {
+    if (typeof p.claude.windowHours === 'number') legacyAi.windowHours = p.claude.windowHours
+    if (typeof p.claude.windowTokenLimit === 'number') legacyAi.windowTokenLimit = p.claude.windowTokenLimit
+  }
+  const merged: VaultHudConfig = {
     ...defaults,
     ...p,
     repos: Array.isArray(p.repos) ? p.repos : defaults.repos,
-    claude: { ...defaults.claude, ...(isPlainObject(p.claude) ? p.claude : {}) },
+    ai: { ...defaults.ai, ...legacyAi, ...(isPlainObject(p.ai) ? p.ai : {}) },
     primaryDirective: {
       ...defaults.primaryDirective,
       ...(isPlainObject(p.primaryDirective) ? p.primaryDirective : {})
     },
     pet: { ...defaults.pet, ...(isPlainObject(p.pet) ? p.pet : {}) },
+    loot: Array.isArray(p.loot) ? p.loot.filter((l): l is string => typeof l === 'string') : defaults.loot,
     ui: { ...defaults.ui, ...(isPlainObject(p.ui) ? p.ui : {}) }
   }
+  delete (merged as unknown as Record<string, unknown>)['claude']
+  return merged
 }
 
 export const CONFIG_DIR = join(homedir(), '.vault-hud')
@@ -80,6 +91,9 @@ async function detectRepoDirs(home: string): Promise<string[]> {
 async function detectDefaults(): Promise<VaultHudConfig> {
   const home = homedir()
   let vaultPath: string | null = null
+  // zero-config detection, best-effort: an Obsidian registry if one exists,
+  // else any conventional plain-markdown folder — the engine itself is
+  // app-agnostic and works over any directory of .md files
   try {
     const oj = await fs.readFile(
       join(home, 'Library/Application Support/obsidian/obsidian.json'),
@@ -87,7 +101,15 @@ async function detectDefaults(): Promise<VaultHudConfig> {
     )
     vaultPath = detectVaultPath(oj)
   } catch {
-    /* no obsidian */
+    /* not an obsidian user */
+  }
+  if (!vaultPath) {
+    for (const candidate of ['Documents/Notes', 'Notes', 'notes']) {
+      if (existsSync(join(home, candidate))) {
+        vaultPath = join(home, candidate)
+        break
+      }
+    }
   }
   return buildDefaultConfig({
     home,

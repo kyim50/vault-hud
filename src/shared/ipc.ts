@@ -1,4 +1,4 @@
-import type { CustomSprite, Directive, HudSnapshot, RepoConfig } from './types'
+import type { AiConfig, CustomSprite, Directive, HudSnapshot, RepoConfig, UiConfig } from './types'
 
 export const IPC = {
   getSnapshot: 'hud:getSnapshot',
@@ -20,7 +20,7 @@ export interface VaultApi {
   toggleDirective(d: Directive, done: boolean): void
   openDoc(relPath: string): void
   resizeNotch(expanded: boolean): void
-  updateConfig(patch: { ui?: Partial<{ theme: 'terminal' | 'paper'; parade: boolean }>; petName?: string; repos?: RepoConfig[] }): void
+  updateConfig(patch: { ui?: Partial<UiConfig>; ai?: Partial<AiConfig>; petName?: string; repos?: RepoConfig[] }): void
   saveSprite(sprite: CustomSprite): void
   deleteSprite(name: string): void
   capture(text: string): void

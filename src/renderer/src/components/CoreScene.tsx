@@ -1,46 +1,23 @@
 import { useEffect, useRef } from 'react'
+import type { LinkGraph, Mood } from '@shared/types'
+import { DEFAULT_PALETTE as PAL, PANDA, PANDA_BODY_ROWS, PANDA_BUDDY, drawPanda } from '../lib/panda'
+import { layoutConstellation, hitStar, type Star } from '../lib/constellation'
+import { drawPixelText, measurePixelText } from '../lib/pixelfont'
+import { loadingPhase } from '../lib/loadingTransition'
 
-// Halftone scene engine, Claude FM style: six rotating scenes, small clay
-// critter with friends, ink dots on the terminal ground.
+// Halftone scene engine: the red panda living out rotating pixel scenes.
+// Dual-state canvas: hovering a Second Brain note dissolves the scene into
+// the wiki-link constellation graph; wandering off dissolves it back.
 const W = 192
 const H = 108
 const INK = '#e8e6e3'
 const BODY = '#d97757'
-const DARK = '#b85c3f'
 const BODY_LIGHT = '#e8a284'
 const EYE = '#17160f'
 const GRAY = '#9a9a9a'
 
 const FPS = 12
 const SCENE_FRAMES = 22 * FPS
-const STATIC_FRAMES = 4
-
-// 22x14 critter (drawn at cell=2 → 44x28 px, small like the references)
-const SPRITE = [
-  '..nn..............nn..',
-  '..nnBBBBBBBBBBBBBBnn..',
-  '..BBBBBBBBBBBBBBBBDD..',
-  '.BBBBBBBBBBBBBBBBBBDD.',
-  '.BBEEBBBBBBBBBBEEBBDD.',
-  '.BBEEBBBBBBBBBBEEBBDD.',
-  '.BBBBBBBBBBBBBBBBBBDD.',
-  '.BBBBBBBBBBBBBBBBBBDD.',
-  '.BBBBBBBBBBBBBBBBBBDD.',
-  '..BBBBBBBBBBBBBBBBDD..',
-  '..BBBBBBBBBBBBBBBBDD..',
-  '...BBBBBBBBBBBBBBDD...',
-  '...LL..LL....LL..LL...',
-  '...LL..LL....LL..LL...'
-]
-const CELL = 2
-
-const BUDDY = [
-  '.BBBBBB.',
-  'BBBBBBBB',
-  'BEBBBBEB',
-  'BBBBBBBB',
-  '.L.LL.L.'
-]
 
 function hash(x: number, y: number): number {
   let h = (x * 374761393 + y * 668265263) | 0
@@ -57,30 +34,18 @@ function wander(f: number, min: number, max: number, speed: number, phase = 0): 
 
 type Ctx = CanvasRenderingContext2D
 
-function drawSprite(ctx: Ctx, rows: string[], sx: number, sy: number, cell: number, blink: boolean, step?: 0 | 1, shades = true): void {
-  for (let r = 0; r < rows.length; r++) {
-    for (let c = 0; c < rows[r].length; c++) {
-      const ch = rows[r][c]
-      if (ch === '.') continue
-      if (step !== undefined && ch === 'L' && r === rows.length - 1) {
-        if (step === 1 && c < rows[r].length / 2) continue
-        if (step === 0 && c >= rows[r].length / 2) continue
-      }
-      ctx.fillStyle =
-        ch === 'E' ? (blink ? BODY : EYE) : (ch === 'D' || ch === 'n') && shades ? DARK : BODY
-      ctx.fillRect(sx + c * cell, sy + r * cell, cell, cell)
-    }
-  }
-}
-
 function drawWalker(ctx: Ctx, f: number, blink: boolean, x: number, groundY: number, moving: boolean): void {
   const bob = moving ? (Math.floor(f / 3) % 2) : (Math.floor(f / 8) % 2)
-  drawSprite(ctx, SPRITE, Math.round(x), groundY - 28 + bob, CELL, blink, bob as 0 | 1)
+  drawPanda(ctx, PANDA, Math.round(x), groundY - PANDA.length * 2 + bob, 2, PAL, { blink, step: bob as 0 | 1 })
+}
+
+function drawSitter(ctx: Ctx, blink: boolean, x: number, y: number): void {
+  drawPanda(ctx, PANDA.slice(0, PANDA_BODY_ROWS), Math.round(x), y, 2, PAL, { blink })
 }
 
 function drawBuddy(ctx: Ctx, f: number, blink: boolean, x: number, groundY: number, hopBeat = 4): void {
   const hop = Math.floor(f / hopBeat) % 3 === 0 ? -2 : 0
-  drawSprite(ctx, BUDDY, Math.round(x), groundY - 10 + hop, 2, blink)
+  drawPanda(ctx, PANDA_BUDDY, Math.round(x), groundY - PANDA_BUDDY.length * 2 + hop, 2, PAL, { blink })
 }
 
 function drawCloud(ctx: Ctx, cx: number, cy: number, rx: number, ry: number): void {
@@ -150,6 +115,83 @@ function drawFlower(ctx: Ctx, x: number, y: number, f: number): void {
   ctx.fillRect(x, y - 1, 1, 1)
 }
 
+// --- loot props ---------------------------------------------------------
+// accessories earned from command runs furnish the panda's ground scenes
+
+function drawProp(ctx: Ctx, name: string, x: number, groundY: number, f: number): void {
+  const g = groundY
+  switch (name) {
+    case 'plant': {
+      ctx.fillStyle = PAL.dark
+      ctx.fillRect(x - 2, g - 3, 5, 3)
+      ctx.fillStyle = INK
+      for (let i = -3; i <= 3; i++) if (hash(x + i, 1) < 0.7) ctx.fillRect(x + i, g - 6 - Math.abs(i) % 2, 1, 2)
+      break
+    }
+    case 'hat':
+      ctx.fillStyle = PAL.dark
+      ctx.fillRect(x - 3, g - 2, 7, 2)
+      ctx.fillRect(x - 1, g - 5, 3, 3)
+      break
+    case 'snail':
+      ctx.fillStyle = INK
+      ctx.fillRect(x, g - 4, 4, 4)
+      ctx.fillRect(x + 1, g - 3, 2, 2)
+      ctx.fillStyle = PAL.dark
+      ctx.fillRect(x - 3, g - 2, 4, 2)
+      ctx.fillRect(x - 4, g - 5, 1, 3)
+      break
+    case 'mug':
+      ctx.fillStyle = INK
+      ctx.fillRect(x - 2, g - 4, 4, 4)
+      ctx.fillRect(x + 2, g - 3, 1, 2)
+      if (f % 16 < 10) ctx.fillRect(x - 1 + (f % 4 < 2 ? 0 : 1), g - 7 - (f % 16) / 4, 1, 1)
+      break
+    case 'banner':
+      ctx.fillStyle = INK
+      ctx.fillRect(x, g - 12, 1, 12)
+      ctx.fillStyle = BODY
+      ctx.fillRect(x + 1, g - 12, 5 + (Math.floor(f / 6) % 2), 3)
+      break
+    case 'lantern':
+      ctx.fillStyle = INK
+      ctx.fillRect(x, g - 9, 1, 9)
+      ctx.fillRect(x - 2, g - 9, 5, 1)
+      ctx.fillStyle = Math.floor(f / 8) % 4 === 0 ? PAL.dark : BODY
+      ctx.fillRect(x - 1, g - 8, 3, 3)
+      break
+    case 'books':
+      ctx.fillStyle = INK
+      ctx.fillRect(x - 3, g - 2, 7, 2)
+      ctx.fillStyle = PAL.dark
+      ctx.fillRect(x - 2, g - 4, 6, 2)
+      ctx.fillStyle = INK
+      ctx.fillRect(x - 3, g - 6, 5, 2)
+      break
+    case 'radio':
+      ctx.fillStyle = INK
+      ctx.fillRect(x - 3, g - 4, 7, 4)
+      ctx.fillRect(x + 2, g - 8, 1, 4)
+      ctx.fillStyle = EYE
+      ctx.fillRect(x - 2, g - 3, 2, 2)
+      if (f % 10 < 5) {
+        ctx.fillStyle = INK
+        ctx.fillRect(x + 5, g - 8 - (f % 10), 1, 1)
+        ctx.fillRect(x + 6, g - 7 - (f % 10), 1, 2)
+      }
+      break
+  }
+}
+
+function drawLoot(ctx: Ctx, loot: string[], horizon: number, f: number): void {
+  for (const name of loot.slice(0, 8)) {
+    let sx = 0
+    for (const ch of name) sx = (sx * 31 + ch.charCodeAt(0)) | 0
+    const x = 10 + Math.round(hash(Math.abs(sx), 77) * (W - 20))
+    drawProp(ctx, name, x, horizon + 2 + Math.round(hash(Math.abs(sx), 78) * 6), f)
+  }
+}
+
 // --- scenes ------------------------------------------------------------
 
 function sceneMeadow(ctx: Ctx, f: number, blink: boolean): void {
@@ -157,12 +199,10 @@ function sceneMeadow(ctx: Ctx, f: number, blink: boolean): void {
   drawCloud(ctx, ((30 + drift) % (W + 120)) - 60, 18, 32, 10)
   drawCloud(ctx, ((140 + drift * 0.6) % (W + 120)) - 60, 34, 22, 7)
   drawCloud(ctx, ((90 + drift * 0.45) % (W + 120)) - 60, 10, 18, 5)
-  // dot sun, top right
   drawCloud(ctx, 168, 14, 8, 7)
   const horizon = 90
   drawHills(ctx, horizon, 5)
   drawGround(ctx, horizon)
-  // tufts of dot grass + flowers
   ctx.fillStyle = INK
   for (let i = 0; i < 14; i++) {
     const gx = Math.round(hash(i, 3) * (W - 10)) + 5
@@ -172,12 +212,10 @@ function sceneMeadow(ctx: Ctx, f: number, blink: boolean): void {
   for (let i = 0; i < 5; i++) {
     drawFlower(ctx, Math.round(hash(i, 21) * (W - 20)) + 10, horizon + Math.round(hash(i, 23) * 8), f + i * 3)
   }
-  // critter and buddy both wander
   const mx = wander(f, 40, 120, 0.5)
   const moving = Math.abs(wander(f + 1, 40, 120, 0.5) - mx) > 0.1
   drawWalker(ctx, f, blink, mx, horizon, moving)
   drawBuddy(ctx, f, blink, wander(f, 130, 168, 0.8, 60), horizon, 3)
-  // bird + butterfly
   const t = f % 110
   if (t < 68) drawBird(ctx, -6 + t * 3, 24 + Math.sin(t / 4) * 4, Math.floor(t / 3) % 2 === 0)
   drawButterfly(ctx, f, wander(f, 20, 60, 1.3), 60 + Math.sin(f / 5) * 6)
@@ -185,34 +223,28 @@ function sceneMeadow(ctx: Ctx, f: number, blink: boolean): void {
 
 function sceneSurf(ctx: Ctx, f: number, blink: boolean): void {
   ctx.fillStyle = INK
-  // sun + gulls + a distant sail
   drawCloud(ctx, 26, 16, 9, 8)
   const g = f % 90
   if (g < 60) drawBird(ctx, W - g * 2.4, 18 + Math.sin(g / 5) * 3, Math.floor(g / 3) % 2 === 0)
   drawBird(ctx, 52 + Math.sin(f / 9) * 4, 30, Math.floor(f / 4) % 2 === 0)
-  for (let k = 0; k < 6; k++) ctx.fillRect(16 + k, 88 - k, 1, 1) // sail
+  for (let k = 0; k < 6; k++) ctx.fillRect(16 + k, 88 - k, 1, 1)
   ctx.fillRect(13, 89, 8, 1)
-  // big swell peaking right of center: steep face on the left, long back
   const surface = (x: number): number => {
     const sigma = x < 146 ? 34 : 70
     return 102 - 66 * Math.exp(-((x - 146) ** 2) / (2 * sigma * sigma))
   }
-  // water dots scroll left so the wave visibly flows
   const flow = Math.floor(f * 1.6)
   for (let x = 0; x < W; x += 2) {
     const top = surface(x)
-    // foam edge shimmers along the crest
     if (hash(x + flow, 999) < 0.75) ctx.fillRect(x, Math.round(top), 1, 1)
     for (let y = Math.round(top) + 2; y < H; y += 2) {
       const depth = (y - top) / (H - top)
       if (hash(x + flow, y) < 0.1 + depth * 0.42) ctx.fillRect(x, y, 1, 1)
     }
   }
-  // dense water band at the bottom, drifting slower
   for (let y = 98; y < H; y += 2) {
     for (let x = 0; x < W; x += 2) if (hash(x + Math.floor(f * 0.8), y + 7) < 0.55) ctx.fillRect(x, y, 1, 1)
   }
-  // curl hooking left off the peak (bezier from crest down-left)
   const p0 = { x: 146, y: 33 }
   const p1 = { x: 118, y: 26 }
   const p2 = { x: 108, y: 54 }
@@ -223,21 +255,18 @@ function sceneSurf(ctx: Ctx, f: number, blink: boolean): void {
     ctx.fillRect(x, y, 1, 1)
     if (hash(x, y) < 0.5) ctx.fillRect(x + 1, y + 1, 1, 1)
   }
-  // spray flecks off the curl
   for (let i = 0; i < 10; i++) {
     const sx = 104 + Math.round(hash(i, Math.floor(f / 2)) * 52)
     const sy = 18 + Math.round(hash(i + 40, Math.floor(f / 2)) * 24)
     ctx.fillRect(sx, sy, 1, 1)
   }
-  // rider on the face, left of the curl — board planted on the wave surface
   const mx = 96 + Math.sin(f / 10) * 8
   let surfY = H
   for (let x = mx - 4; x <= mx + 50; x += 4) surfY = Math.min(surfY, surface(x))
-  // the rider rises and dips with the swell
   const boardY = Math.round(surfY + 1 + Math.sin(f / 6) * 3.5)
   ctx.fillStyle = BODY_LIGHT
   ctx.fillRect(Math.round(mx - 4), boardY, 54, 3)
-  drawSprite(ctx, SPRITE.slice(0, 12), Math.round(mx), boardY - 24, CELL, blink)
+  drawSitter(ctx, blink, mx, boardY - PANDA_BODY_ROWS * 2)
 }
 
 function sceneDisco(ctx: Ctx, f: number, blink: boolean): void {
@@ -260,7 +289,6 @@ function sceneDisco(ctx: Ctx, f: number, blink: boolean): void {
       ctx.fillRect(Math.round(hash(i, 7) * (W - 8)) + 4, Math.round(hash(i, 13) * 66) + 8, 1, 1)
     }
   }
-  // sweeping light beams from the ball
   for (let b = 0; b < 3; b++) {
     const ang = Math.PI / 2 + Math.sin(f / 24 + b * 2.1) * 0.7
     for (let r = 18; r < 66; r += 4) {
@@ -271,25 +299,24 @@ function sceneDisco(ctx: Ctx, f: number, blink: boolean): void {
   }
   const floor = 94
   drawGround(ctx, floor, 0.28)
-  // dance floor tile corners
   for (let x = 8; x < W - 8; x += 12) {
     for (let y = floor + 2; y < H; y += 6) {
       if ((x / 12 + y / 6) % 2 < 1) ctx.fillRect(x, y, 2, 1)
     }
   }
-  // DJ critter behind the decks
+  // DJ panda behind the decks
   const bob = Math.floor(f / 3) % 2
   const sx = Math.round(W / 2 - 22)
-  const sy = floor - 28 - 8 + bob
-  drawSprite(ctx, SPRITE, sx, sy, CELL, blink, bob as 0 | 1)
-  // headphones
+  const sy = floor - PANDA.length * 2 - 8 + bob
+  drawPanda(ctx, PANDA, sx, sy, 2, PAL, { blink, step: bob as 0 | 1 })
+  // headphones: a band across the crown + over-ear cups hugging each side
+  // (positioned for the blob mascot — clear of the eyes at cols 5-6 / 16-17)
   ctx.fillStyle = INK
-  for (let c = 4; c < 18; c++) ctx.fillRect(sx + c * CELL, sy - CELL, CELL, CELL)
-  for (let r = 2; r < 6; r++) {
-    ctx.fillRect(sx - CELL, sy + r * CELL, CELL + 1, CELL)
-    ctx.fillRect(sx + 21 * CELL, sy + r * CELL, CELL + 1, CELL)
+  for (let c = 4; c <= 19; c++) ctx.fillRect(sx + c * 2, sy + 2, 2, 2)
+  for (let r = 2; r <= 7; r++) {
+    ctx.fillRect(sx + 2 * 2, sy + r * 2, 2, 2)
+    ctx.fillRect(sx + 21 * 2, sy + r * 2, 2, 2)
   }
-  // deck table + spinning platters
   for (let x = 58; x < 134; x += 2) ctx.fillRect(x, floor - 8, 1, 1)
   ctx.fillStyle = EYE
   ctx.fillRect(64, floor - 6, 12, 3)
@@ -297,14 +324,12 @@ function sceneDisco(ctx: Ctx, f: number, blink: boolean): void {
   ctx.fillStyle = INK
   ctx.fillRect(69 + (f % 4 < 2 ? 1 : -1), floor - 5, 2, 1)
   ctx.fillRect(121 + (f % 4 < 2 ? -1 : 1), floor - 5, 2, 1)
-  // two buddies dancing, out of phase
   drawBuddy(ctx, f, blink, wander(f, 18, 44, 1.1), floor, 3)
   drawBuddy(ctx, f + 3, blink, wander(f, 146, 172, 1.1, 26), floor, 3)
 }
 
 function sceneGarden(ctx: Ctx, f: number, blink: boolean): void {
   ctx.fillStyle = INK
-  // window frame
   for (let x = 58; x <= 150; x += 2) {
     ctx.fillRect(x, 10, 1, 1)
     ctx.fillRect(x, 56, 1, 1)
@@ -313,13 +338,11 @@ function sceneGarden(ctx: Ctx, f: number, blink: boolean): void {
     ctx.fillRect(58, y, 1, 1)
     ctx.fillRect(150, y, 1, 1)
   }
-  // dot sun with rays
   drawCloud(ctx, 88, 28, 9, 8)
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2 + f / 40
     ctx.fillRect(Math.round(88 + Math.cos(a) * 13), Math.round(28 + Math.sin(a) * 12), 1, 1)
   }
-  // big plants: arcs of dot fronds from each pot
   for (const [px, flip] of [[18, 1], [176, -1]] as const) {
     for (let leaf = 0; leaf < 5; leaf++) {
       const spread = (leaf - 2) * 0.35
@@ -334,13 +357,11 @@ function sceneGarden(ctx: Ctx, f: number, blink: boolean): void {
       for (let x = px - 7; x <= px + 7; x += 2) if (hash(x, y) < 0.6) ctx.fillRect(x, y, 1, 1)
     }
   }
-  // hanging shelf with books, right of the window
   for (let x = 156; x < 184; x += 2) ctx.fillRect(x, 30, 1, 1)
   ctx.fillRect(158, 22, 3, 8)
   ctx.fillRect(163, 24, 3, 6)
   ctx.fillRect(168, 21, 2, 9)
   ctx.fillRect(173, 25, 4, 5)
-  // picture frame, left of the window
   for (let x = 34; x <= 50; x += 2) {
     ctx.fillRect(x, 20, 1, 1)
     ctx.fillRect(x, 34, 1, 1)
@@ -352,13 +373,11 @@ function sceneGarden(ctx: Ctx, f: number, blink: boolean): void {
   drawCloud(ctx, 42, 27, 4, 3)
   const horizon = 92
   drawGround(ctx, horizon, 0.26)
-  // rug under the critter
   ctx.fillStyle = INK
   for (let x = 52; x < 104; x += 3) {
     ctx.fillRect(x, horizon + 4, 1, 1)
     ctx.fillRect(x + 1, horizon + 8, 1, 1)
   }
-  // desk with a mug
   for (let x = 108; x < 152; x += 2) ctx.fillRect(x, horizon - 18, 1, 1)
   for (let y = horizon - 18; y < horizon; y += 2) {
     ctx.fillRect(110, y, 1, 1)
@@ -368,19 +387,12 @@ function sceneGarden(ctx: Ctx, f: number, blink: boolean): void {
     for (let x = 124; x < 130; x += 1) if (hash(x, y) < 0.7) ctx.fillRect(x, y, 1, 1)
   }
   ctx.fillRect(131, horizon - 22, 1, 2)
-  // steam
   const s = f % 16
   if (s < 10) ctx.fillRect(126 + (s % 4 < 2 ? 0 : 1), horizon - 26 - s, 1, 1)
-  // critter with a gray tail, pottering near the desk
+  // panda pottering near the desk (its ringed tail is part of the sprite)
   const mx = wander(f, 62, 96, 0.35)
   const moving = Math.abs(wander(f + 1, 62, 96, 0.35) - mx) > 0.05
   drawWalker(ctx, f, blink, mx, horizon, moving)
-  ctx.fillStyle = GRAY
-  const flick = Math.floor(f / 6) % 2
-  ctx.fillRect(Math.round(mx) - 5, horizon - 8, 8, 2) // tail meets the body
-  ctx.fillRect(Math.round(mx) - 8, horizon - 11 - flick, 4, 2)
-  ctx.fillRect(Math.round(mx) - 10, horizon - 14 - flick, 3, 2)
-  // butterfly visiting the plants
   drawButterfly(ctx, f, wander(f, 150, 180, 0.9), 50 + Math.sin(f / 6) * 5)
 }
 
@@ -389,7 +401,6 @@ function sceneGlobe(ctx: Ctx, f: number, blink: boolean): void {
   const cx = 96
   const cy = 128
   const R = 66
-  // rotating dot-continent globe
   const off = f * 0.5
   for (let y = cy - R; y < H; y += 2) {
     for (let x = 0; x < W; x += 2) {
@@ -404,7 +415,6 @@ function sceneGlobe(ctx: Ctx, f: number, blink: boolean): void {
       }
     }
   }
-  // two orbiting satellites + a crescent moon
   const oa = f / 18
   ctx.fillRect(Math.round(cx + Math.cos(oa) * 84), Math.round(62 + Math.sin(oa) * 20), 2, 2)
   ctx.fillRect(Math.round(cx + Math.cos(-oa * 1.4 + 2) * 92), Math.round(58 + Math.sin(-oa * 1.4 + 2) * 26), 1, 1)
@@ -415,25 +425,23 @@ function sceneGlobe(ctx: Ctx, f: number, blink: boolean): void {
       if (inMoon && !inBite && hash(x + 300, y) < 0.8) ctx.fillRect(24 + x, 16 + y, 1, 1)
     }
   }
-  // stars
   for (let i = 0; i < 26; i++) {
     if (hash(i, Math.floor(f / 5)) > 0.35) {
       ctx.fillRect(Math.round(hash(i, 3) * (W - 8)) + 4, Math.round(hash(i, 5) * 46) + 4, 1, 1)
     }
   }
-  // critter with sunglasses on top of the world
+  // panda with sunglasses on top of the world
   const sx = cx - 22
-  const sy = cy - R - 26
-  drawSprite(ctx, SPRITE.slice(0, 12), sx, sy, CELL, false)
+  const sy = cy - R - PANDA_BODY_ROWS * 2 - 2
+  drawSitter(ctx, false, sx, sy)
   ctx.fillStyle = EYE
-  ctx.fillRect(sx + 2 * CELL, sy + 4 * CELL, 8 * CELL, blink ? CELL : 2 * CELL)
-  ctx.fillRect(sx + 12 * CELL, sy + 4 * CELL, 6 * CELL, blink ? CELL : 2 * CELL)
-  ctx.fillRect(sx + 10 * CELL, sy + 4 * CELL, 2 * CELL, 1)
+  ctx.fillRect(sx + 5 * 2, sy + 4 * 2, 5 * 2, blink ? 2 : 4)
+  ctx.fillRect(sx + 15 * 2, sy + 4 * 2, 5 * 2, blink ? 2 : 4)
+  ctx.fillRect(sx + 10 * 2, sy + 4 * 2, 5 * 2, 1)
 }
 
 function sceneNight(ctx: Ctx, f: number, blink: boolean): void {
   ctx.fillStyle = INK
-  // dense twinkling starfield + a constellation
   for (let i = 0; i < 56; i++) {
     if (hash(i, Math.floor(f / 6) + Math.floor(i / 7)) > 0.3) {
       ctx.fillRect(Math.round(hash(i, 11) * (W - 8)) + 4, Math.round(hash(i, 17) * 62) + 4, 1, 1)
@@ -450,13 +458,11 @@ function sceneNight(ctx: Ctx, f: number, blink: boolean): void {
       }
     }
   }
-  // moon with craters
   drawCloud(ctx, 152, 22, 12, 11)
   ctx.fillStyle = '#1e1e1e'
   ctx.fillRect(148, 18, 3, 3)
   ctx.fillRect(156, 26, 2, 2)
   ctx.fillStyle = INK
-  // shooting star every ~9s
   const t = f % 108
   if (t < 10) {
     for (let k = 0; k < 5; k++) ctx.fillRect(20 + t * 6 - k * 3, 14 + t * 2 - k, 1, 1)
@@ -464,7 +470,6 @@ function sceneNight(ctx: Ctx, f: number, blink: boolean): void {
   const horizon = 92
   drawHills(ctx, horizon, 11)
   drawGround(ctx, horizon, 0.3)
-  // fireflies drifting low
   for (let i = 0; i < 4; i++) {
     if (hash(i, Math.floor(f / 4)) > 0.4) {
       ctx.fillRect(
@@ -474,7 +479,6 @@ function sceneNight(ctx: Ctx, f: number, blink: boolean): void {
       )
     }
   }
-  // campfire: flicker + smoke
   const fx = 120
   ctx.fillStyle = BODY
   const lick = Math.floor(f / 2) % 3
@@ -484,19 +488,16 @@ function sceneNight(ctx: Ctx, f: number, blink: boolean): void {
   ctx.fillRect(fx - 4, horizon - 1, 11, 1)
   const sm = f % 14
   if (sm < 10) ctx.fillRect(fx + 1 + (sm % 4 < 2 ? 1 : -1), horizon - 10 - sm, 1, 1)
-  // critter and buddy sitting by the fire
   drawWalker(ctx, f, blink, 78, horizon, false)
   drawBuddy(ctx, f, blink, 140, horizon, 8)
 }
 
 function sceneRain(ctx: Ctx, f: number, blink: boolean): void {
   ctx.fillStyle = INK
-  // heavy clouds
   drawCloud(ctx, 40, 12, 30, 8)
   drawCloud(ctx, 110, 8, 34, 7)
   drawCloud(ctx, 168, 14, 22, 6)
   const horizon = 92
-  // slanted rain streaks
   for (let i = 0; i < 46; i++) {
     const rx = (hash(i, 5) * W + f * 1.2) % W
     const ry = (hash(i, 9) * H + f * 5) % (horizon - 18) + 18
@@ -504,7 +505,6 @@ function sceneRain(ctx: Ctx, f: number, blink: boolean): void {
     ctx.fillRect(Math.round(rx) + 1, Math.round(ry) - 2, 1, 2)
   }
   drawGround(ctx, horizon, 0.32)
-  // puddle with ripple rings
   const px = 132
   for (let x = -16; x <= 16; x += 2) {
     if (hash(x + 50, 2) < 0.7) ctx.fillRect(px + x, horizon + 6, 1, 1)
@@ -514,11 +514,9 @@ function sceneRain(ctx: Ctx, f: number, blink: boolean): void {
   for (let a = 0; a < Math.PI * 2; a += 0.5) {
     if (rip < 0.8) ctx.fillRect(Math.round(px + Math.cos(a) * rr), Math.round(horizon + 6 + Math.sin(a) * rr * 0.3), 1, 1)
   }
-  // critter under an umbrella, buddy splashing in the puddle
   const mx = wander(f, 44, 84, 0.3)
   const moving = Math.abs(wander(f + 1, 44, 84, 0.3) - mx) > 0.05
   drawWalker(ctx, f, blink, mx, horizon, moving)
-  // umbrella: dotted canopy + gray stem
   const ux = Math.round(mx) + 21
   for (let x = -16; x <= 16; x += 2) {
     const y = -Math.round(Math.sqrt(Math.max(0, 256 - x * x)) * 0.45)
@@ -532,14 +530,12 @@ function sceneRain(ctx: Ctx, f: number, blink: boolean): void {
 
 function sceneRooftop(ctx: Ctx, f: number, blink: boolean): void {
   ctx.fillStyle = INK
-  // stars + moon
   for (let i = 0; i < 30; i++) {
     if (hash(i, Math.floor(f / 6)) > 0.35) {
       ctx.fillRect(Math.round(hash(i, 11) * (W - 8)) + 4, Math.round(hash(i, 13) * 40) + 4, 1, 1)
     }
   }
   drawCloud(ctx, 30, 16, 9, 8)
-  // skyline: dotted towers with twinkling windows
   const towers = [
     [8, 56, 22], [36, 44, 18], [60, 62, 16], [82, 38, 24], [112, 52, 20], [138, 46, 16], [160, 58, 26]
   ]
@@ -552,19 +548,16 @@ function sceneRooftop(ctx: Ctx, f: number, blink: boolean): void {
       ctx.fillRect(tx, y, 1, 1)
       ctx.fillRect(tx + tw, y, 1, 1)
     }
-    // lit windows blink slowly
     for (let wy = ty + 4; wy < 84; wy += 6) {
       for (let wx = tx + 3; wx < tx + tw - 2; wx += 5) {
         if (hash(wx, wy + Math.floor(f / 30)) > 0.55) ctx.fillRect(wx, wy, 2, 2)
       }
     }
   }
-  // foreground rooftop
   for (let x = 0; x < W; x += 1) ctx.fillRect(x, 88, 1, 1)
   for (let y = 90; y < H; y += 2) {
     for (let x = 0; x < W; x += 2) if (hash(x, y) < 0.3) ctx.fillRect(x, y, 1, 1)
   }
-  // antenna with a blinking clay beacon
   ctx.fillRect(160, 66, 1, 22)
   ctx.fillRect(156, 72, 9, 1)
   if (Math.floor(f / 6) % 2 === 0) {
@@ -572,169 +565,555 @@ function sceneRooftop(ctx: Ctx, f: number, blink: boolean): void {
     ctx.fillRect(159, 63, 3, 3)
     ctx.fillStyle = INK
   }
-  // critter and buddy sitting on the edge, looking at the city
-  drawSprite(ctx, SPRITE.slice(0, 12), 66, 88 - 24 + (Math.floor(f / 8) % 2), CELL, blink)
+  drawSitter(ctx, blink, 66, 88 - PANDA_BODY_ROWS * 2 + (Math.floor(f / 8) % 2))
   drawBuddy(ctx, f, blink, 104, 88 + 2, 8)
-  // a bird crosses the skyline
   const t = f % 130
   if (t < 80) drawBird(ctx, W - t * 2.6, 30 + Math.sin(t / 6) * 4, Math.floor(t / 3) % 2 === 0)
 }
 
+// burnout nap: the panda curls up under the moon to nudge you toward a break
+function sceneNap(ctx: Ctx, f: number, _blink: boolean): void {
+  ctx.fillStyle = INK
+  for (let i = 0; i < 22; i++) {
+    if (hash(i, Math.floor(f / 8)) > 0.45) {
+      ctx.fillRect(Math.round(hash(i, 11) * (W - 8)) + 4, Math.round(hash(i, 17) * 50) + 4, 1, 1)
+    }
+  }
+  // crescent moon
+  for (let y = -8; y <= 8; y++) {
+    for (let x = -8; x <= 8; x++) {
+      const inMoon = x * x + y * y <= 64
+      const inBite = (x - 4) * (x - 4) + y * y <= 49
+      if (inMoon && !inBite && hash(x + 500, y) < 0.85) ctx.fillRect(158 + x, 20 + y, 1, 1)
+    }
+  }
+  const horizon = 92
+  drawHills(ctx, horizon, 8)
+  drawGround(ctx, horizon, 0.24)
+  // rug
+  ctx.fillStyle = INK
+  for (let x = 70; x < 126; x += 3) {
+    ctx.fillRect(x, horizon + 2, 1, 1)
+    ctx.fillRect(x + 1, horizon + 5, 1, 1)
+  }
+  // curled panda: body mound + ears + ringed tail wrapped around the front
+  const cx = 96
+  const breathe = Math.floor(f / 10) % 2
+  ctx.fillStyle = PAL.body
+  for (let y = -8 - breathe; y <= 0; y++) {
+    const half = Math.round(Math.sqrt(Math.max(0, 1 - (y / (8 + breathe)) ** 2)) * 15)
+    ctx.fillRect(cx - half, horizon - 1 + y, half * 2, 1)
+  }
+  ctx.fillStyle = PAL.dark
+  ctx.fillRect(cx - 12, horizon - 10 - breathe, 2, 2) // ear
+  ctx.fillRect(cx - 8, horizon - 11 - breathe, 2, 2) // ear
+  // tail rings wrapping the front
+  const rings = [PAL.dark, PAL.ink, PAL.dark, PAL.ink, PAL.dark]
+  rings.forEach((col, i) => {
+    ctx.fillStyle = col
+    ctx.fillRect(cx - 10 + i * 5, horizon - 3, 5, 3)
+  })
+  // closed eye + Zzz
+  ctx.fillStyle = PAL.eye
+  ctx.fillRect(cx - 9, horizon - 7 - breathe, 3, 1)
+  ctx.fillStyle = INK
+  const z = Math.floor(f / 8) % 3
+  ctx.fillRect(cx + 14 + z * 4, horizon - 16 - z * 4, 3, 1)
+  ctx.fillRect(cx + 15 + z * 4, horizon - 15 - z * 4, 1, 1)
+  ctx.fillRect(cx + 14 + z * 4, horizon - 14 - z * 4, 3, 1)
+  // gentle nudge, terminal-dim, crisp bitmap pixels
+  drawPixelText(ctx, 'TAKE A BREAK · NOTHING DONE IN 90M', cx, H - 9, { color: GRAY, align: 'center' })
+}
+
 const SCENES = [sceneMeadow, sceneSurf, sceneGarden, sceneDisco, sceneGlobe, sceneNight, sceneRain, sceneRooftop]
 const DISCO = 3
-const TRANS_FRAMES = 24 // ~2s: dissolve → linked orb → scatter into next scene
+// scenes with a walkable ground line — loot props furnish these
+const HORIZONS: Record<number, number> = { 0: 90, 2: 92, 3: 94, 5: 92, 6: 92, 7: 88 }
+const TRANS_FRAMES = 30 // ~2.5s: dissolve out → loading beat → dissolve in
 
-interface Particle {
-  sx: number; sy: number // start (pixel of outgoing scene)
-  tx: number; ty: number // target (pixel of incoming scene)
-  a: number; r: number; tilt: number // orbit params
-  color: string
-}
-
-// render a scene offscreen and sample up to n lit pixels (position + color)
-function samplePixels(scene: (ctx: Ctx, f: number, b: boolean) => void, f: number, n: number): { x: number; y: number; color: string }[] {
-  const off = document.createElement('canvas')
-  off.width = W
-  off.height = H
-  const octx = off.getContext('2d')!
-  scene(octx, f, false)
-  const img = octx.getImageData(0, 0, W, H).data
-  const lit: { x: number; y: number; color: string }[] = []
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const i = (y * W + x) * 4
-      if (img[i + 3] > 0) {
-        lit.push({ x, y, color: `rgb(${img[i]},${img[i + 1]},${img[i + 2]})` })
+// chunky ordered pixel dissolve: replace an `amount` (0..1) fraction of 4px
+// blocks of `ctx` with the matching blocks from `src`. Shared by the scene
+// transition and the scene⇄constellation composite.
+function ditherBlocks(ctx: Ctx, src: HTMLCanvasElement, amount: number): void {
+  const B = 4
+  for (let by = 0; by < H / B; by++) {
+    for (let bx = 0; bx < W / B; bx++) {
+      if (hash(bx, by) < amount) {
+        ctx.clearRect(bx * B, by * B, B, B)
+        ctx.drawImage(src, bx * B, by * B, B, B, bx * B, by * B, B, B)
       }
     }
   }
-  const step = Math.max(1, Math.floor(lit.length / n))
-  const out: { x: number; y: number; color: string }[] = []
-  for (let i = 0; i < lit.length && out.length < n; i += step) out.push(lit[i])
-  return out
 }
 
-function buildParticles(fromScene: number, toScene: number, fromF: number, toF: number): Particle[] {
-  const src = samplePixels(SCENES[fromScene], fromF, 300)
-  const dst = samplePixels(SCENES[toScene], toF, 300)
-  const count = Math.min(src.length, dst.length)
-  const parts: Particle[] = []
-  for (let i = 0; i < count; i++) {
-    const s = src[i]
-    const d = dst[(i * 7) % count] // shuffle pairings so paths cross
-    parts.push({
-      sx: s.x, sy: s.y, tx: d.x, ty: d.y,
-      a: hash(i, 1) * Math.PI * 2,
-      r: 18 + hash(i, 2) * 14,
-      tilt: 0.45 + hash(i, 3) * 0.25,
-      color: s.color
-    })
+// the loading beat: the blob centered, "working" (a bob + alternating foot
+// tap via the gait step), with 1–3 cycling dots underneath
+function drawLoading(ctx: Ctx, f: number): void {
+  ctx.clearRect(0, 0, W, H)
+  const bob = Math.floor(f / 3) % 2
+  const cw = PANDA[0].length * 2
+  const ch = PANDA.length * 2
+  const sx = Math.round(W / 2 - cw / 2)
+  const sy = Math.round(H / 2 - ch / 2) - 4 + bob
+  drawPanda(ctx, PANDA, sx, sy, 2, PAL, { blink: false, step: bob as 0 | 1 })
+  const n = 1 + (Math.floor(f / 4) % 3) // · ·· ···
+  const gap = 6
+  let dx = Math.round(W / 2 - ((n - 1) * gap) / 2)
+  const dotY = sy + ch + 6
+  ctx.fillStyle = INK
+  for (let i = 0; i < n; i++) {
+    ctx.fillRect(dx - 1, dotY, 2, 2)
+    dx += gap
   }
-  return parts
 }
 
-const ease = (t: number): number => 1 - Math.pow(1 - t, 3)
+// Loading-interstitial transition: dissolve the frozen outgoing scene out to
+// the loading beat, hold it, then dissolve the live incoming scene in.
+function drawLoadingTransition(
+  ctx: Ctx,
+  fromBuf: HTMLCanvasElement,
+  toBuf: HTMLCanvasElement,
+  loadBuf: HTMLCanvasElement,
+  fromCtx: Ctx,
+  toCtx: Ctx,
+  loadCtx: Ctx,
+  fromScene: number,
+  toScene: number,
+  frozenF: number,
+  liveF: number,
+  blink: boolean,
+  t: number
+): void {
+  const { phase, mix } = loadingPhase(t)
+  ctx.clearRect(0, 0, W, H)
+  if (phase === 'hold') {
+    drawLoading(ctx, liveF)
+    return
+  }
+  drawLoading(loadCtx, liveF)
+  if (phase === 'out') {
+    // outgoing scene frozen at its last frame, dissolving toward loading
+    fromCtx.clearRect(0, 0, W, H)
+    SCENES[fromScene](fromCtx, frozenF, false)
+    ctx.drawImage(fromBuf, 0, 0)
+    ditherBlocks(ctx, loadBuf, mix)
+  } else {
+    // loading dissolving toward the live incoming scene
+    toCtx.clearRect(0, 0, W, H)
+    SCENES[toScene](toCtx, liveF, blink)
+    ctx.drawImage(loadBuf, 0, 0)
+    ditherBlocks(ctx, toBuf, mix)
+  }
+}
 
-function drawTransition(ctx: Ctx, parts: Particle[], t: number): void {
-  const cx = W / 2
-  const cy = 52
-  const spin = 2.6
-  const pos = (p: Particle): { x: number; y: number } => {
-    if (t < 0.35) {
-      // gather: scene pixels spiral in toward their orbit slot
-      const k = ease(t / 0.35)
-      const ox = cx + Math.cos(p.a) * p.r
-      const oy = cy + Math.sin(p.a) * p.r * p.tilt
-      return { x: p.sx + (ox - p.sx) * k, y: p.sy + (oy - p.sy) * k }
+// --- constellation graph state -------------------------------------------
+
+// star-chart palette: three depths of ink so the sky recedes properly
+const FAR = '#43423b'
+const CHART = '#54534a'
+const DARKPULSE = '#b85c3f'
+
+function drawGraph(
+  ctx: Ctx,
+  stars: Star[],
+  edges: [number, number][],
+  f: number,
+  focusRel: string | null,
+  hover: number
+): void {
+  const focus = stars.find((s) => s.ring === 0)
+  const focused = focusRel !== null && !!focus
+
+  // --- deep sky: two parallax layers + the odd shooting star ---
+  for (let i = 0; i < 26; i++) {
+    if (hash(i, Math.floor(f / 9)) > 0.35) {
+      ctx.fillStyle = FAR
+      ctx.fillRect(Math.round(hash(i, 31) * (W - 6)) + 3, Math.round(hash(i, 37) * (H - 24)) + 3, 1, 1)
     }
-    if (t < 0.68) {
-      // orbit: the orb spins as one body
-      const k = (t - 0.35) / 0.33
-      const a = p.a + k * spin
-      return { x: cx + Math.cos(a) * p.r, y: cy + Math.sin(a) * p.r * p.tilt }
+  }
+  for (let i = 0; i < 10; i++) {
+    if (hash(i + 60, Math.floor(f / 5)) > 0.45) {
+      ctx.fillStyle = GRAY
+      ctx.fillRect(Math.round(hash(i + 60, 13) * (W - 8)) + 4, Math.round(hash(i + 60, 17) * (H - 30)) + 4, 1, 1)
     }
-    // scatter: fly out to the incoming scene's pixels
-    const k = ease((t - 0.68) / 0.32)
-    const a = p.a + spin
-    const ox = cx + Math.cos(a) * p.r
-    const oy = cy + Math.sin(a) * p.r * p.tilt
-    return { x: ox + (p.tx - ox) * k, y: oy + (p.ty - oy) * k }
   }
-  const pts: { x: number; y: number }[] = []
-  for (const p of parts) {
-    const q = pos(p)
-    pts.push(q)
-    ctx.fillStyle = p.color
-    ctx.fillRect(Math.round(q.x), Math.round(q.y), 1, 1)
-  }
-  // constellation links while the orb holds together
-  if (t >= 0.28 && t < 0.75) {
+  const shoot = f % 150
+  if (shoot < 9) {
     ctx.fillStyle = INK
-    for (let i = 0; i < pts.length; i += 9) {
-      const a = pts[i]
-      const b = pts[(i + 4) % pts.length]
-      const dx = b.x - a.x
-      const dy = b.y - a.y
-      if (dx * dx + dy * dy > 26 * 26) continue
-      for (let s = 0.25; s < 1; s += 0.25) {
-        ctx.fillRect(Math.round(a.x + dx * s), Math.round(a.y + dy * s), 1, 1)
+    for (let k = 0; k < 4; k++) ctx.fillRect(130 + shoot * 5 - k * 3, 10 + shoot * 2 - k, 1, 1)
+  }
+
+  // --- chart furniture: corner brackets + faint crosshair marks ---
+  ctx.fillStyle = CHART
+  for (const [cx2, cy2, sx, sy] of [[2, 2, 1, 1], [W - 3, 2, -1, 1], [2, H - 3, 1, -1], [W - 3, H - 3, -1, -1]] as const) {
+    ctx.fillRect(cx2, cy2, sx * 4, 1)
+    ctx.fillRect(cx2, cy2, 1, sy * 4)
+  }
+  for (let i = 0; i < 3; i++) {
+    const mx = 14 + Math.round(hash(i, 91) * (W - 28))
+    const my = 12 + Math.round(hash(i, 97) * (H - 40))
+    ctx.fillRect(mx - 2, my, 5, 1)
+    ctx.fillRect(mx, my - 2, 1, 5)
+  }
+
+  // --- orbit guide: dotted ellipse where the neighbors ride ---
+  if (focused && focus) {
+    ctx.fillStyle = CHART
+    for (let a = 0; a < 32; a++) {
+      if ((a + Math.floor(f / 6)) % 2) continue // slow counter-rotation
+      const t = (a / 32) * Math.PI * 2
+      ctx.fillRect(Math.round(focus.x + Math.cos(t) * W * 0.27), Math.round(focus.y + Math.sin(t) * H * 0.27), 1, 1)
+    }
+  }
+
+  // --- links: focus links get a dotted rail + a traveling clay pulse ---
+  for (const [a, b] of edges) {
+    let s1 = stars[a]
+    let s2 = stars[b]
+    const isFocusEdge = s1.ring === 0 || s2.ring === 0
+    if (s2.ring === 0) [s1, s2] = [s2, s1] // pulse flows away from the focus
+    const dx = s2.x - s1.x
+    const dy = s2.y - s1.y
+    const len = Math.max(1, Math.sqrt(dx * dx + dy * dy))
+    const steps = Math.max(4, Math.floor(len / 3))
+    ctx.fillStyle = isFocusEdge ? GRAY : focused ? FAR : CHART
+    for (let s = 1; s < steps; s++) {
+      if (s % 2 === 0) continue
+      ctx.fillRect(Math.round(s1.x + (dx * s) / steps), Math.round(s1.y + (dy * s) / steps), 1, 1)
+    }
+    if (isFocusEdge) {
+      // the pulse: a 2px clay packet with a fading tail, looping outward
+      const head = ((f * 1.5) % (len + 10)) / len
+      for (let k = 0; k < 3; k++) {
+        const t = head - k * 0.07
+        if (t < 0 || t > 1) continue
+        ctx.fillStyle = k === 0 ? BODY : DARKPULSE
+        const px = Math.round(s1.x + dx * t)
+        const py = Math.round(s1.y + dy * t)
+        ctx.fillRect(px - (k === 0 ? 1 : 0), py - (k === 0 ? 1 : 0), k === 0 ? 2 : 1, k === 0 ? 2 : 1)
       }
     }
   }
+
+  // --- stars ---
+  const starburst = (x: number, y: number, color: string, big: boolean): void => {
+    ctx.fillStyle = color
+    if (big) {
+      ctx.fillRect(x - 1, y - 1, 3, 3)
+      for (const [ax, ay] of [[-3, 0], [3, 0], [0, -3], [0, 3]] as const) {
+        ctx.fillRect(x + ax, y + ay, 1, 1)
+        ctx.fillRect(x + (ax ? ax / 3 : 0) * 2, y + (ay ? ay / 3 : 0) * 2, 1, 1)
+      }
+    } else {
+      ctx.fillRect(x, y, 1, 1)
+      ctx.fillRect(x - 1, y, 3, 1)
+      ctx.fillRect(x, y - 1, 1, 3)
+    }
+  }
+
+  let labeled = 0
+  const placedLabels: { x0: number; x1: number; y0: number; y1: number }[] = []
+  stars.forEach((s, i) => {
+    const isFocus = s.ring === 0
+    const isHover = i === hover && !isFocus
+    if (isFocus) return // drawn last, on top
+    if (!isHover && hash(i, Math.floor(f / 5)) < (s.ring === 3 && focused ? 0.3 : 0.06)) return
+    if (s.ring === 3) {
+      ctx.fillStyle = focused ? CHART : s.node.links >= 2 ? INK : GRAY
+      const sz = !focused && s.node.links >= 2 ? 2 : 1
+      ctx.fillRect(s.x, s.y, sz, sz)
+    } else if (s.ring === 2) {
+      ctx.fillStyle = GRAY
+      ctx.fillRect(s.x, s.y - 1, 1, 3)
+      ctx.fillRect(s.x - 1, s.y, 3, 1)
+    } else {
+      starburst(s.x, s.y, isHover ? BODY : INK, false)
+    }
+    if (isHover) starburst(s.x, s.y, BODY, true)
+    // neighbors wear their names — crisp bitmap pixels, placed outward
+    // from the focus, then bumped down a line whenever boxes collide
+    if ((s.ring === 1 && labeled < 6) || isHover) {
+      labeled++
+      const name = s.node.title.slice(0, 12)
+      const tw = measurePixelText(name)
+      let placeRight = s.x >= (focus?.x ?? W / 2)
+      if (placeRight && s.x + 5 + tw > W - 2) placeRight = false
+      if (!placeRight && s.x - 5 - tw < 2) placeRight = true
+      const x0 = placeRight ? s.x + 5 : s.x - 5 - tw
+      const x1 = x0 + tw
+      let ly = Math.max(3, Math.min(H - 22, s.y - 2))
+      let guard = 0
+      while (
+        guard++ < 4 &&
+        placedLabels.some((p) => x0 < p.x1 + 3 && x1 > p.x0 - 3 && ly < p.y1 + 2 && ly + 5 > p.y0 - 2)
+      ) {
+        ly += 8
+      }
+      placedLabels.push({ x0, x1, y0: ly, y1: ly + 5 })
+      drawPixelText(ctx, name, placeRight ? s.x + 5 : s.x - 5, ly, {
+        color: isHover ? BODY : GRAY,
+        align: placeRight ? 'left' : 'right'
+      })
+    }
+  })
+
+  // --- the focused star: clay starburst + dither glow + rotating ring ---
+  if (focus) {
+    for (let gy = -6; gy <= 6; gy++) {
+      for (let gx = -6; gx <= 6; gx++) {
+        const d = gx * gx + gy * gy
+        if (d > 12 && d <= 36 && hash(gx + 200, gy + Math.floor(f / 3)) < 0.16) {
+          ctx.fillStyle = DARKPULSE
+          ctx.fillRect(focus.x + gx, focus.y + gy, 1, 1)
+        }
+      }
+    }
+    starburst(focus.x, focus.y, BODY, true)
+    const ra = f / 9
+    ctx.fillStyle = BODY
+    for (let k = 0; k < 4; k++) {
+      const t = ra + (k * Math.PI) / 2
+      ctx.fillRect(Math.round(focus.x + Math.cos(t) * 7), Math.round(focus.y + Math.sin(t) * 7), 1, 1)
+    }
+  }
+
+  // --- chart legend: crisp pixel type, quiet hierarchy (color, not size) ---
+  drawPixelText(ctx, 'STAR CHART', 8, 4, { color: CHART })
+  drawPixelText(ctx, focused ? 'CLICK CENTER TO OPEN' : 'CLICK A STAR TO FOCUS', 8, 11, { color: FAR })
+  drawPixelText(ctx, `${stars.length} NOTES · ${edges.length} LINKS`, W - 8, 4, { color: CHART, align: 'right' })
+  const title = focus ?? (hover >= 0 ? stars[hover] : undefined)
+  if (title) {
+    const name = title.node.title.slice(0, 26)
+    const links = ` · ${title.node.links} LINKS`
+    const tw = measurePixelText(name)
+    const lw = measurePixelText(links)
+    const x0 = Math.round(W / 2 - (tw + lw) / 2)
+    drawPixelText(ctx, name, x0, H - 12, { color: INK })
+    drawPixelText(ctx, links, x0 + tw, H - 12, { color: GRAY })
+    // dotted underline gives the nameplate a cartographic feel
+    ctx.fillStyle = CHART
+    for (let x = 0; x < tw + lw + 8; x += 2) ctx.fillRect(x0 - 4 + x, H - 4, 1, 1)
+  }
 }
 
-export function CoreScene({ usagePercent, busy }: { usagePercent: number; busy: boolean }) {
+export function CoreScene({
+  usagePercent,
+  busy,
+  mood,
+  loot,
+  graph,
+  chart
+}: {
+  usagePercent: number
+  busy: boolean
+  mood: Mood
+  loot: string[]
+  graph: LinkGraph
+  chart: boolean
+}) {
   const ref = useRef<HTMLCanvasElement>(null)
   const busyRef = useRef(busy)
   busyRef.current = busy
   const usageRef = useRef(usagePercent)
   usageRef.current = usagePercent
+  const moodRef = useRef(mood)
+  moodRef.current = mood
+  const lootRef = useRef(loot)
+  lootRef.current = loot
+  const graphRef = useRef(graph)
+  graphRef.current = graph
+  const chartRef = useRef(chart)
+  chartRef.current = chart
+
+  // constellation reveal state — driven by Second Brain hover events and by
+  // the pointer being over the canvas itself (so you can travel to a star)
+  const focusRef = useRef<string | null>(null)
+  const focusUntil = useRef(0)
+  const overCanvas = useRef(false)
+  const hoverStarRef = useRef(-1)
+  const starsRef = useRef<{ stars: Star[]; edges: [number, number][] }>({ stars: [], edges: [] })
+
   // mount the loop exactly once — prop changes must never reset the frame
   // counter or the scene rotation restarts from meadow on every usage tick
   useEffect(() => {
     const canvas = ref.current!
     const ctx = canvas.getContext('2d')!
-    let parts: Particle[] | null = null
-    let partsSlot = -1
+    const sceneOff = document.createElement('canvas')
+    sceneOff.width = W
+    sceneOff.height = H
+    const sctx = sceneOff.getContext('2d')!
+    const graphOff = document.createElement('canvas')
+    graphOff.width = W
+    graphOff.height = H
+    const gctx = graphOff.getContext('2d')!
+    // scratch buffers for the loading-interstitial transition
+    const bufFrom = document.createElement('canvas')
+    bufFrom.width = W
+    bufFrom.height = H
+    const cFrom = bufFrom.getContext('2d')!
+    const bufTo = document.createElement('canvas')
+    bufTo.width = W
+    bufTo.height = H
+    const cTo = bufTo.getContext('2d')!
+    const bufLoad = document.createElement('canvas')
+    bufLoad.width = W
+    bufLoad.height = H
+    const cLoad = bufLoad.getContext('2d')!
+
     let raf = 0
     let lastFrame = -1
+    let dissolve = 0 // 0 = scene · 1 = graph
+    // stars glide toward their layout targets when the focus re-centers
+    const glide = new Map<string, { x: number; y: number }>()
     const start = performance.now()
 
-    // scenes step at a chunky 12fps; the transition runs on continuous time
-    // at full refresh rate so the orb glides instead of stuttering
+    const onReveal = (e: Event): void => {
+      const rel = (e as CustomEvent).detail as string | null
+      if (rel) {
+        focusRef.current = rel
+        focusUntil.current = Infinity
+      } else {
+        // grace period so the pointer can travel from the note to the canvas
+        focusUntil.current = performance.now() + 1400
+      }
+    }
+    window.addEventListener('vault:constellation', onReveal)
+
     const loop = (now: number): void => {
-      const tf = ((now - start) / 1000) * FPS // fractional frame clock
+      const tf = ((now - start) / 1000) * FPS
       const frame = Math.floor(tf)
+
+      // --- state machine: scene ⇄ constellation ---
+      // sticky CHART mode keeps the sky up for browsing; otherwise a note
+      // hover summons it and the pointer resting on the canvas only KEEPS
+      // it open (so you can travel to a star and click it)
+      const wantGraph =
+        (chartRef.current || focusUntil.current > now || (overCanvas.current && dissolve > 0)) &&
+        graphRef.current.nodes.length > 0
+      if (!wantGraph && focusUntil.current <= now) focusRef.current = null
+      const target = wantGraph ? 1 : 0
+      const dStep = 0.09 // ~0.7s chunky pixel dissolve at 60fps
+      dissolve = Math.max(0, Math.min(1, dissolve + (target > dissolve ? dStep : dissolve > target ? -dStep : 0)))
+      canvas.style.cursor = dissolve > 0.9 && hoverStarRef.current >= 0 ? 'pointer' : 'default'
+
+      // --- render the active scene into its offscreen (12fps stepping) ---
       const slot = Math.floor(frame / SCENE_FRAMES)
       const sceneIdx = busyRef.current ? DISCO : slot % SCENES.length
+      const napping = !busyRef.current && moodRef.current === 'napping'
       const inScene = tf - slot * SCENE_FRAMES
-      if (inScene < TRANS_FRAMES && slot > 0 && !busyRef.current) {
-        if (partsSlot !== slot) {
+      if (dissolve < 1) {
+        if (!napping && inScene < TRANS_FRAMES && slot > 0 && !busyRef.current) {
           const prev = (slot - 1) % SCENES.length
-          parts = buildParticles(prev, sceneIdx, frame - 1, frame + TRANS_FRAMES)
-          partsSlot = slot
+          const blinkEvery = usageRef.current > 80 ? 24 : 48
+          const frozenF = slot * SCENE_FRAMES - 1 // last frame of the outgoing scene
+          drawLoadingTransition(
+            sctx,
+            bufFrom,
+            bufTo,
+            bufLoad,
+            cFrom,
+            cTo,
+            cLoad,
+            prev,
+            sceneIdx,
+            frozenF,
+            frame,
+            frame % blinkEvery >= blinkEvery - 6,
+            inScene / TRANS_FRAMES
+          )
+          lastFrame = -1
+        } else if (frame !== lastFrame) {
+          const blinkEvery = usageRef.current > 80 ? 24 : 48
+          sctx.clearRect(0, 0, W, H)
+          if (napping) {
+            sceneNap(sctx, frame, false)
+          } else {
+            SCENES[sceneIdx](sctx, frame, frame % blinkEvery >= blinkEvery - 6)
+            const horizon = HORIZONS[sceneIdx]
+            if (horizon !== undefined) drawLoot(sctx, lootRef.current, horizon, frame)
+          }
+          lastFrame = frame
         }
-        ctx.clearRect(0, 0, W, H)
-        drawTransition(ctx, parts!, inScene / TRANS_FRAMES)
-        lastFrame = -1
-      } else if (frame !== lastFrame) {
-        parts = null
-        const blinkEvery = usageRef.current > 80 ? 24 : 48
-        ctx.clearRect(0, 0, W, H)
-        SCENES[sceneIdx](ctx, frame, frame % blinkEvery >= blinkEvery - 6)
-        lastFrame = frame
+      }
+
+      // --- render the graph into its offscreen when visible ---
+      if (dissolve > 0) {
+        const layout = layoutConstellation(graphRef.current, W, H, focusRef.current)
+        // ease every star toward its slot — re-centering feels like the
+        // constellation re-arranging itself around the hovered note
+        const shown = layout.stars.map((s) => {
+          const cur = glide.get(s.node.relPath) ?? { x: s.x, y: s.y }
+          cur.x += (s.x - cur.x) * 0.25
+          cur.y += (s.y - cur.y) * 0.25
+          glide.set(s.node.relPath, cur)
+          return { ...s, x: Math.round(cur.x), y: Math.round(cur.y) }
+        })
+        starsRef.current = { stars: shown, edges: layout.edges }
+        gctx.clearRect(0, 0, W, H)
+        drawGraph(gctx, shown, layout.edges, frame, focusRef.current, hoverStarRef.current)
+      } else {
+        glide.clear() // next reveal starts fresh from layout targets
+        // no live stars while the scene shows — stale hits must not
+        // re-summon the graph from a bare canvas hover
+        if (starsRef.current.stars.length) starsRef.current = { stars: [], edges: [] }
+      }
+
+      // --- composite: chunky ordered pixel dissolve between the states ---
+      ctx.clearRect(0, 0, W, H)
+      if (dissolve <= 0) {
+        ctx.drawImage(sceneOff, 0, 0)
+      } else if (dissolve >= 1) {
+        ctx.drawImage(graphOff, 0, 0)
+      } else {
+        ctx.drawImage(sceneOff, 0, 0)
+        ditherBlocks(ctx, graphOff, dissolve)
       }
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(raf)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('vault:constellation', onReveal)
+    }
   }, [])
+
+  // canvas-space pointer math (the canvas is CSS-scaled)
+  const toCanvas = (e: React.MouseEvent<HTMLCanvasElement>): { x: number; y: number } => {
+    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect()
+    return { x: ((e.clientX - rect.left) / rect.width) * W, y: ((e.clientY - rect.top) / rect.height) * H }
+  }
+
   return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0 }}>
       <canvas
         ref={ref}
         width={W}
         height={H}
+        onMouseEnter={() => (overCanvas.current = true)}
+        onMouseLeave={() => {
+          overCanvas.current = false
+          hoverStarRef.current = -1
+        }}
+        onMouseMove={(e) => {
+          // hover only highlights + labels — the sky must hold still while
+          // you aim (re-centering on hover made stars flee the cursor)
+          const { x, y } = toCanvas(e)
+          hoverStarRef.current = hitStar(starsRef.current.stars, x, y)
+        }}
+        onClick={(e) => {
+          // click a star to pull its neighborhood to the center; click the
+          // centered star again to open the note in the OS default editor
+          const { x, y } = toCanvas(e)
+          const i = hitStar(starsRef.current.stars, x, y)
+          if (i < 0) return
+          const star = starsRef.current.stars[i]
+          if (star.ring === 0) {
+            window.vault.openDoc(star.node.relPath)
+          } else {
+            focusRef.current = star.node.relPath
+            focusUntil.current = performance.now() + 2500
+          }
+        }}
         style={{ width: '100%', maxWidth: 560, imageRendering: 'pixelated', aspectRatio: '16/9' }}
       />
     </div>

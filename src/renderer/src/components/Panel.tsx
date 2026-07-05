@@ -7,7 +7,7 @@ export function Panel({
   style
 }: {
   title: string
-  corner?: string
+  corner?: ReactNode
   children: ReactNode
   style?: CSSProperties
 }) {

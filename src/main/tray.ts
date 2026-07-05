@@ -7,12 +7,18 @@ export function setupTray(state: HudState, showHud: () => void): Tray {
   const render = (): void => {
     tray.setTitle(`◉ ${state.snapshot.usage.percent}%`, { fontType: 'monospacedDigit' })
     const commands = state.snapshot.commands
-    const fingerprint = commands.map((c) => `${c.info.id}:${c.status.state}`).join()
+    const fingerprint = `${state.snapshot.usage.mode};` + commands.map((c) => `${c.info.id}:${c.status.state}`).join()
     if (fingerprint === lastFingerprint) return
     lastFingerprint = fingerprint
     tray.setContextMenu(
       Menu.buildFromTemplate([
-        { label: `Claude 5h window: ${state.snapshot.usage.percent}%`, enabled: false },
+        {
+          label:
+            state.snapshot.usage.mode === 'cpu'
+              ? `Local CPU load: ${state.snapshot.usage.percent}%`
+              : `Token window: ${state.snapshot.usage.percent}%`,
+          enabled: false
+        },
         { type: 'separator' },
         { label: 'Open HUD', click: showHud },
         {

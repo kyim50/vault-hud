@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { execFile } from 'node:child_process'
-import type { CommandInfo, CommandStatus, VaultHudConfig } from '@shared/types'
+import type { AiConfig, CommandInfo, CommandStatus, VaultHudConfig } from '@shared/types'
 import { parseCommandFile, renderPrompt } from './commandFile'
 import { localDateStamp } from '../collectors/vaultNotes'
 
@@ -20,26 +20,52 @@ interface LoadedCommand {
   status: CommandStatus
 }
 
-export const claudeSpawn: SpawnFn = (prompt, allowedTools, cwd) =>
-  new Promise((resolve) => {
-    const args = ['-p', prompt, '--output-format', 'text']
-    if (allowedTools) args.push('--allowedTools', allowedTools)
-    execFile('claude', args, { cwd, timeout: 600_000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-      resolve({ code: err ? 1 : 0, output: `${stdout}\n${stderr}`.trim() })
+// provider-routed CLI invocation: each provider's headless agent binary and
+// argument shape, resolved at run time from the active config
+export function buildAgentInvocation(
+  ai: AiConfig,
+  prompt: string,
+  allowedTools: string
+): { bin: string; args: string[] } {
+  switch (ai.provider) {
+    case 'openai':
+      return { bin: 'codex', args: ['exec', prompt] }
+    case 'ollama':
+      return { bin: 'ollama', args: ['run', ai.ollamaModel || 'llama3.2', prompt] }
+    case 'anthropic':
+    default: {
+      const args = ['-p', prompt, '--output-format', 'text']
+      if (allowedTools) args.push('--allowedTools', allowedTools)
+      return { bin: 'claude', args }
+    }
+  }
+}
+
+export function makeAgentSpawn(getAi: () => AiConfig): SpawnFn {
+  return (prompt, allowedTools, cwd) =>
+    new Promise((resolve) => {
+      const { bin, args } = buildAgentInvocation(getAi(), prompt, allowedTools)
+      execFile(bin, args, { cwd, timeout: 600_000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+        resolve({ code: err ? 1 : 0, output: `${stdout}\n${stderr}`.trim() })
+      })
     })
-  })
+}
 
 export class CommandRunner extends EventEmitter {
   private commands = new Map<string, LoadedCommand>()
   private queue: string[] = []
   private running = false
+  private spawnFn: SpawnFn
 
   constructor(
     private commandsDir: string,
     private config: VaultHudConfig,
-    private spawnFn: SpawnFn = claudeSpawn
+    spawnFn?: SpawnFn
   ) {
     super()
+    // default spawn re-reads config.ai each run, so a provider toggle in
+    // the notch applies to the very next command
+    this.spawnFn = spawnFn ?? makeAgentSpawn(() => this.config.ai)
   }
 
   async load(): Promise<void> {

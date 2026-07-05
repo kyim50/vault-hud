@@ -1,5 +1,6 @@
 import type { Directive } from '@shared/types'
 import { Panel } from './Panel'
+import { lofi } from '../lib/audio'
 
 export function DirectivesPanel({ directives }: { directives: Directive[] }) {
   const top = directives.filter((d) => !d.done).slice(0, 3)
@@ -8,7 +9,7 @@ export function DirectivesPanel({ directives }: { directives: Directive[] }) {
     <Panel title="Directives" corner={`${doneCount}/${directives.length} DONE`}>
       {top.length === 0 && (
         <div className="dim">
-          {directives.length > 0 ? 'all directives complete' : 'no plan yet — run PLAN TODAY'}
+          {directives.length > 0 ? 'all directives complete' : 'no open tasks — capture some `- [ ]` boxes'}
         </div>
       )}
       {top.map((d) => (
@@ -16,10 +17,17 @@ export function DirectivesPanel({ directives }: { directives: Directive[] }) {
           <input
             type="checkbox"
             checked={d.done}
-            onChange={(e) => window.vault.toggleDirective(d, e.target.checked)}
+            onChange={(e) => {
+              // square-wave tick pop as the checkbox is written back to disk
+              if (e.target.checked) lofi.tick()
+              window.vault.toggleDirective(d, e.target.checked)
+            }}
             style={{ accentColor: 'var(--ink)' }}
           />
-          <span>{d.text}</span>
+          <span>
+            {d.text}
+            {d.due && <span className="dim" style={{ fontSize: 9 }}> · {d.due}</span>}
+          </span>
         </label>
       ))}
     </Panel>

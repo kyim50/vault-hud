@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, shell, Tray } from 'electron'
-import { join } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import { IPC } from '@shared/ipc'
 import type { CustomSprite, Directive, RepoConfig, VaultHudConfig } from '@shared/types'
 import { loadOrCreateConfig, saveConfig, CONFIG_PATH } from './config'
@@ -68,6 +68,7 @@ app.whenReady().then(async () => {
       await setDirectiveDone(config, d, done)
       if (done) {
         config.pet.xp += 1
+        state.noteDirectiveDone()
         void saveConfig(config)
       }
       await state.refreshVault()
@@ -75,9 +76,10 @@ app.whenReady().then(async () => {
       console.error('vault-hud: toggleDirective failed', e)
     }
   })
-  ipcMain.on(IPC.updateConfig, async (_e, patch: { ui?: Partial<VaultHudConfig['ui']>; petName?: string; repos?: RepoConfig[] }) => {
+  ipcMain.on(IPC.updateConfig, async (_e, patch: { ui?: Partial<VaultHudConfig['ui']>; ai?: Partial<VaultHudConfig['ai']>; petName?: string; repos?: RepoConfig[] }) => {
     try {
       if (patch.ui) Object.assign(config.ui, patch.ui)
+      if (patch.ai) Object.assign(config.ai, patch.ai)
       if (typeof patch.petName === 'string' && patch.petName.trim()) config.pet.name = patch.petName.trim().slice(0, 12)
       if (Array.isArray(patch.repos)) config.repos = patch.repos
       await saveConfig(config)
@@ -110,11 +112,13 @@ app.whenReady().then(async () => {
       console.error('vault-hud: capture failed', e)
     }
   })
+  // app-agnostic: open the note in whatever the OS considers its default
+  // editor — no vendor URL schemes (path containment enforced)
   ipcMain.on(IPC.openDoc, (_e, relPath: string) => {
-    const vaultName = config.vaultPath.split('/').pop() ?? ''
-    void shell.openExternal(
-      `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(relPath.replace(/\.md$/, ''))}`
-    )
+    const root = resolve(config.vaultPath)
+    const full = resolve(root, relPath)
+    if (!full.startsWith(root + sep)) return
+    void shell.openPath(full)
   })
 
   createHudWindow()

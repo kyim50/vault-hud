@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import '../styles/theme.css'
 import { useSnapshot } from '../lib/useSnapshot'
+import { PANDA_MINI, drawPanda } from '../lib/panda'
+import type { Provider } from '@shared/types'
 
 // Boring Notch-style island: collapsed strip that blends with the hardware
-// notch; hover expands to artwork tile + tabbed details about your Claude.
+// notch; hover expands to artwork tile + tabbed details about your agent.
 const CREAM = '#f4f2e9'
 const CLAY = '#d97757'
 const DARK_CLAY = '#b85c3f'
@@ -12,23 +14,14 @@ const EDGE = '#3a382e'
 
 const TABS = ['STATUS', 'PLAN', 'GIT', 'RUN'] as const
 type Tab = (typeof TABS)[number]
+const PROVIDERS: Provider[] = ['anthropic', 'openai', 'ollama']
 
-// mini artwork: the critter bobbing/blinking on a dotted floor, album-art style
+// mini artwork: the red panda bobbing/blinking on a dotted floor
 function MiniMascot() {
   const ref = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const ctx = ref.current!.getContext('2d')!
-    const SPR = [
-      '.nn........nn.',
-      '.nnBBBBBBBBnn.',
-      'BBBBBBBBBBBBDD',
-      'BBEBBBBBBEBBDD',
-      'BBEBBBBBBEBBDD',
-      'BBBBBBBBBBBBDD',
-      'BBBBBBBBBBBBDD',
-      '.BBBBBBBBBBDD.',
-      '.L.LL....LL.L.'
-    ]
+    const pal = { body: CLAY, dark: DARK_CLAY, ink: CREAM, eye: '#17160f', muzzle: '#e8a284' }
     let f = 0
     const draw = (): void => {
       ctx.clearRect(0, 0, 44, 44)
@@ -37,15 +30,7 @@ function MiniMascot() {
         if ((x * 7) % 5 > 1) ctx.fillRect(x, 40, 1, 1)
       }
       const bob = Math.floor(f / 5) % 2
-      const blink = f % 40 >= 36
-      for (let r = 0; r < SPR.length; r++) {
-        for (let c = 0; c < SPR[r].length; c++) {
-          const ch = SPR[r][c]
-          if (ch === '.') continue
-          ctx.fillStyle = ch === 'E' ? (blink ? CLAY : '#17160f') : ch === 'D' || ch === 'n' ? DARK_CLAY : CLAY
-          ctx.fillRect(8 + c * 2, 6 + r * 2 + bob, 2, 2)
-        }
-      }
+      drawPanda(ctx, PANDA_MINI, 8, 20 + bob, 2, pal, { blink: f % 40 >= 36 })
       f++
     }
     draw()
@@ -140,9 +125,11 @@ export default function NotchApp() {
             {tab === 'STATUS' && (
               <div style={{ ...mono, display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: DIM }}>CLAUDE 5H WINDOW</span>
+                  <span style={{ color: DIM }}>{snap.usage.mode === 'cpu' ? 'LOCAL CPU LOAD' : 'TOKEN WINDOW'}</span>
                   <span style={{ color: snap.usage.percent > 80 ? CLAY : CREAM }}>
-                    {snap.usage.percent}% · {Math.round(snap.usage.windowTokens / 1000)}K
+                    {snap.usage.mode === 'cpu'
+                      ? `${snap.usage.percent}% · ${snap.usage.cores ?? 0} cores`
+                      : `${snap.usage.percent}% · ${Math.round(snap.usage.windowTokens / 1000)}K`}
                   </span>
                 </div>
                 <div style={{ height: 4, background: '#26251e', borderRadius: 2 }}>
@@ -203,6 +190,40 @@ export default function NotchApp() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {expanded && snap && (
+        // flat multi-provider matrix at the island's foot — clicking routes
+        // command execution and re-aims the usage meter instantly
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: 8,
+            padding: '0 14px 8px',
+            flexShrink: 0
+          }}
+        >
+          {PROVIDERS.map((p) => {
+            const active = snap.usage.provider === p
+            return (
+              <span
+                key={p}
+                onClick={() => window.vault.updateConfig({ ai: { provider: p } })}
+                style={{
+                  ...label,
+                  cursor: 'pointer',
+                  padding: '3px 6px',
+                  color: active ? CLAY : DIM,
+                  border: `1px solid ${active ? CLAY : EDGE}`,
+                  borderRadius: 3
+                }}
+              >
+                [ {p.toUpperCase()} ]
+              </span>
+            )
+          })}
         </div>
       )}
     </div>

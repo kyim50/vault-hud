@@ -1,62 +1,22 @@
 import { useRef, useState } from 'react'
 import type { CustomSprite, HudSnapshot } from '@shared/types'
+import { crunchImageData } from '../lib/quantize'
 
-// Settings overlay: theme, parade, pet name, repos, and the Sprite Studio —
-// drop an image, it gets crunched into vault's ink+clay 8-bit language.
-const INK = '#e8e6e3'
-const GRAY = '#9a9a9a'
-const EYE = '#17160f'
-const BODY = '#d97757'
-const DARK = '#b85c3f'
+// Settings overlay: theme, frame critters, repos, and the Sprite Studio —
+// drop an image, it gets crunched into an 8-bit sprite that keeps the
+// image's own palette (median-cut) with its backdrop stripped.
 
-const BAYER = [
-  [0, 8, 2, 10],
-  [12, 4, 14, 6],
-  [3, 11, 1, 9],
-  [15, 7, 13, 5]
-]
-
-// quantize an image into the app's palette on a small grid
 function crunch(img: HTMLImageElement, size = 24): string[][] {
   const c = document.createElement('canvas')
   c.width = size
   c.height = size
   const ctx = c.getContext('2d')!
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
   // cover-fit crop to square
   const s = Math.min(img.width, img.height)
   ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size)
-  const data = ctx.getImageData(0, 0, size, size).data
-  const grid: string[][] = []
-  for (let y = 0; y < size; y++) {
-    const row: string[] = []
-    for (let x = 0; x < size; x++) {
-      const i = (y * size + x) * 4
-      const [r, g, b, a] = [data[i], data[i + 1], data[i + 2], data[i + 3]]
-      if (a < 100) {
-        row.push('')
-        continue
-      }
-      const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-      const max = Math.max(r, g, b)
-      const min = Math.min(r, g, b)
-      const sat = max === 0 ? 0 : (max - min) / max
-      const warm = r > g && g >= b
-      const threshold = (BAYER[y % 4][x % 4] + 0.5) / 16
-      if (sat > 0.3 && warm) {
-        row.push(lum > 0.45 ? BODY : DARK)
-      } else if (lum > 0.78) {
-        row.push(INK)
-      } else if (lum > 0.45) {
-        row.push(lum - 0.3 > threshold * 0.5 ? GRAY : INK)
-      } else if (lum > 0.22) {
-        row.push(lum > threshold * 0.45 ? GRAY : EYE)
-      } else {
-        row.push(EYE)
-      }
-    }
-    grid.push(row)
-  }
-  return grid
+  return crunchImageData(ctx.getImageData(0, 0, size, size).data, size, size)
 }
 
 function SpritePreview({ grid, cell = 5 }: { grid: string[][]; cell?: number }) {
@@ -84,7 +44,6 @@ function SpritePreview({ grid, cell = 5 }: { grid: string[][]; cell?: number }) 
 }
 
 export function SettingsPanel({ snap, onClose }: { snap: HudSnapshot; onClose: () => void }) {
-  const [petName, setPetName] = useState(snap.pet.name)
   const [draft, setDraft] = useState<{ name: string; grid: string[][] } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -126,27 +85,23 @@ export function SettingsPanel({ snap, onClose }: { snap: HudSnapshot; onClose: (
         </div>
 
         <div style={row}>
-          <span style={{ ...label, width: 70 }}>PARADE</span>
+          <span style={{ ...label, width: 70 }}>FRAME</span>
           <button onClick={() => window.vault.updateConfig({ ui: { parade: !snap.ui.parade } })} style={{ fontSize: 10 }}>
-            {snap.ui.parade ? '● on — critters cross the top' : '○ off'}
+            {snap.ui.parade ? '● on — critters patrol the frame' : '○ off'}
           </button>
         </div>
 
         <div style={row}>
-          <span style={{ ...label, width: 70 }}>PET NAME</span>
-          <input
-            value={petName}
-            maxLength={12}
-            onChange={(e) => setPetName(e.target.value)}
-            onBlur={() => petName.trim() && window.vault.updateConfig({ petName })}
-            style={{ background: 'var(--bg)', color: 'var(--ink)', border: '1px solid var(--line-soft)', fontFamily: 'var(--font-mono)', fontSize: 11, padding: '3px 6px', width: 120 }}
-          />
+          <span style={{ ...label, width: 70 }}>LAYOUT</span>
+          <span className="dim" style={{ fontSize: 10 }}>
+            hover a panel and drag its ⠿ grip to rearrange the columns
+          </span>
         </div>
 
         <div style={{ borderTop: '1px dotted var(--line-soft)', paddingTop: 8 }}>
           <div style={{ ...label, marginBottom: 6 }}>SPRITE STUDIO</div>
           <div className="dim" style={{ fontSize: 10, marginBottom: 6 }}>
-            drop any image — it becomes an 8-bit sprite in vault's ink + clay. put it in the parade or make it your pet.
+            drop any image — it becomes a flat 8-bit sprite in its own palette, backdrop stripped. show it big in the totem panel or send it on frame patrol.
           </div>
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
           <button onClick={() => fileRef.current?.click()} style={{ fontSize: 10 }}>· choose image</button>
@@ -160,7 +115,7 @@ export function SettingsPanel({ snap, onClose }: { snap: HudSnapshot; onClose: (
                   onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                   style={{ background: 'var(--bg)', color: 'var(--ink)', border: '1px solid var(--line-soft)', fontFamily: 'var(--font-mono)', fontSize: 11, padding: '3px 6px', width: 130 }}
                 />
-                {(['parade', 'pet', 'none'] as const).map((use) => (
+                {(['totem', 'frame', 'none'] as const).map((use) => (
                   <button
                     key={use}
                     onClick={() => {
@@ -169,7 +124,7 @@ export function SettingsPanel({ snap, onClose }: { snap: HudSnapshot; onClose: (
                     }}
                     style={{ fontSize: 10 }}
                   >
-                    save → {use === 'none' ? 'library only' : use}
+                    save → {use === 'none' ? 'library only' : use === 'totem' ? 'totem panel' : 'frame patrol'}
                   </button>
                 ))}
               </div>
@@ -181,7 +136,7 @@ export function SettingsPanel({ snap, onClose }: { snap: HudSnapshot; onClose: (
                 <div key={s.name} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                   <SpritePreview grid={s.grid} cell={2} />
                   <span style={{ fontSize: 11, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
-                  {(['parade', 'pet', 'none'] as const).map((use) => (
+                  {(['totem', 'frame', 'none'] as const).map((use) => (
                     <span
                       key={use}
                       onClick={() => window.vault.saveSprite({ ...s, use })}

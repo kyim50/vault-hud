@@ -1,9 +1,9 @@
 ---
 label: SKILL MINER
-description: Mine recent Claude sessions for communication stumbles; grow a skill library
+description: Mine recent agent sessions for communication stumbles; grow a skill library
 allowed-tools: Read Write Glob Grep Bash(ls:*) Bash(python3:*)
 ---
-You are mining my recent Claude Code sessions to find where I struggle to communicate, then turning those stumbles into a reusable skill library in my vault.
+You are mining my recent CLI agent sessions to find where I struggle to communicate, then turning those stumbles into a reusable skill library in my vault.
 
 ## 1. Gather
 

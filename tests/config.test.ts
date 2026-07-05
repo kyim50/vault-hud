@@ -34,8 +34,9 @@ describe('buildDefaultConfig', () => {
       { name: 'proj-a', path: '/Users/k/Desktop/proj-a' },
       { name: 'proj-b', path: '/Users/k/Desktop/proj-b' }
     ])
-    expect(cfg.claude.windowHours).toBe(5)
-    expect(cfg.claude.windowTokenLimit).toBeGreaterThan(0)
+    expect(cfg.ai.provider).toBe('anthropic')
+    expect(cfg.ai.windowHours).toBe(5)
+    expect(cfg.ai.windowTokenLimit).toBeGreaterThan(0)
     expect(cfg.primaryDirective.source).toBe('commitsThisWeek')
   })
   it('uses empty vaultPath when null', () => {
@@ -47,12 +48,20 @@ describe('buildDefaultConfig', () => {
 describe('mergeConfig', () => {
   const defaults = buildDefaultConfig({ home: '/u', vaultPath: '/u/vault', repoDirs: [] })
 
-  it('fills missing primaryDirective/claude keys from defaults', () => {
-    const merged = mergeConfig({ appName: 'Custom', claude: { windowHours: 8 } }, defaults)
+  it('fills missing primaryDirective/ai keys from defaults', () => {
+    const merged = mergeConfig({ appName: 'Custom', ai: { windowHours: 8 } }, defaults)
     expect(merged.appName).toBe('Custom')
-    expect(merged.claude.windowHours).toBe(8)
-    expect(merged.claude.windowTokenLimit).toBe(defaults.claude.windowTokenLimit)
+    expect(merged.ai.windowHours).toBe(8)
+    expect(merged.ai.windowTokenLimit).toBe(defaults.ai.windowTokenLimit)
     expect(merged.primaryDirective).toEqual(defaults.primaryDirective)
+  })
+
+  it('migrates legacy claude config into the ai block', () => {
+    const merged = mergeConfig({ claude: { windowHours: 8, windowTokenLimit: 500 } }, defaults)
+    expect(merged.ai.windowHours).toBe(8)
+    expect(merged.ai.windowTokenLimit).toBe(500)
+    expect(merged.ai.provider).toBe('anthropic')
+    expect('claude' in merged).toBe(false)
   })
 
   it('returns defaults when input is not a plain object', () => {

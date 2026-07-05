@@ -114,9 +114,30 @@ button:disabled { color: var(--ink-dim); cursor: default; }
   to { opacity: 1; transform: translateY(0); }
 }
 .panel { animation: rise 400ms cubic-bezier(0.22, 1, 0.36, 1) backwards; }
-.panel:nth-child(1) { animation-delay: 40ms; }
-.panel:nth-child(2) { animation-delay: 110ms; }
-.panel:nth-child(3) { animation-delay: 180ms; }
+.panel:nth-child(1), .arrange:nth-child(1) .panel { animation-delay: 40ms; }
+.panel:nth-child(2), .arrange:nth-child(2) .panel { animation-delay: 110ms; }
+.panel:nth-child(3), .arrange:nth-child(3) .panel { animation-delay: 180ms; }
+
+/* rearrangeable panel wrapper: the ⠿ grip fades in on hover, drag it to
+   reorder panels (order persists in config) */
+.arrange { position: relative; }
+.arrange .grip {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  z-index: 2;
+  color: var(--ink-dim);
+  background: var(--panel);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 3px;
+  user-select: none;
+}
+.arrange:hover .grip { opacity: 1; }
+.arrange .grip:active { cursor: grabbing; color: var(--clay); }
 
 /* notch island stays dark — it blends with the hardware notch */
 body.notch { background: transparent; color: #f4f2e9; }
