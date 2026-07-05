@@ -33,9 +33,9 @@ import { resolve } from '../theme/resolve'
 import { applyTheme } from '../theme/apply'
 import { setSceneColors } from '../theme/sceneColors'
 
-// the two side columns render these modules in user-chosen order (drag the
-// ⠿ grip); the order persists in config as ui.layout, and each module's
-// enabled/options come from config.ui.modules[id] (see resolveModule)
+// any module can live in any zone, in any order — drag a panel's ⠿ grip to
+// move it between zones; the placement persists in config.ui.layout.zones,
+// and each module's enabled/options come from config.ui.modules[id] (see resolveModule)
 const MODULES: Record<string, HudModule<any>> = {
   fetch: { id: 'fetch', defaults: DEFAULT_FETCH_OPTIONS, render: (s, o: FetchOptions) => <VaultfetchPanel snap={s} opts={o} /> },
   vitals: { id: 'vitals', defaults: {}, render: (s) => <VitalsPanel repos={s.repos} usage={s.usage} audio={s.ui.audio} /> },
@@ -174,6 +174,31 @@ export default function App() {
     window.vault.updateConfig({ ui: { layout: { zones: next } } })
   }
 
+  const writeLayout = (next: string[][]): void => {
+    setLocalLayout(next)
+    window.vault.updateConfig({ ui: { layout: { zones: next } } })
+  }
+
+  const addZone = (side: 'start' | 'end'): void => {
+    const next = side === 'start' ? [[], ...zones] : [...zones, []]
+    // adding a zone before the flex zone shifts it right by one — keep the same zone flexing
+    if (side === 'start') {
+      const g = localGeometry ?? geo
+      window.vault.updateConfig({ ui: { geometry: { ...snap.ui.geometry, flexZone: g.flexZone + 1 } } })
+    }
+    writeLayout(next)
+  }
+
+  const removeZone = (zoneIdx: number): void => {
+    if (zones.length <= 1) return // never remove the last zone
+    const next = zones.filter((_, i) => i !== zoneIdx)
+    const g = localGeometry ?? geo
+    // keep the flex zone pointing at the same logical column after the splice
+    const nextFlex = Math.max(0, Math.min(next.length - 1, zoneIdx < g.flexZone ? g.flexZone - 1 : g.flexZone))
+    window.vault.updateConfig({ ui: { geometry: { ...snap.ui.geometry, flexZone: nextFlex } } })
+    writeLayout(next)
+  }
+
   const renderZone = (zoneIdx: number): ReactNode => {
     const isFlex = zoneIdx === geo.flexZone
     const handleSide = zoneIdx < geo.flexZone ? 'right' : 'left'
@@ -236,6 +261,8 @@ export default function App() {
                   setOver(null)
                 }}
                 style={{
+                  // GROWS panels (e.g. Second Brain) soak up leftover height instead of
+                  // being crushed when the window shrinks — the zone scrolls instead
                   flex: GROWS.has(id) ? '1 0 auto' : '0 0 auto',
                   display: 'flex',
                   flexDirection: 'column',
@@ -257,6 +284,28 @@ export default function App() {
               </div>
             )
           })}
+          {zones[zoneIdx].length === 0 && (
+            <div
+              className="dim"
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                border: '1px dashed var(--line-soft)',
+                fontSize: 10
+              }}
+            >
+              <span>drop a panel here</span>
+              {zones.length > 1 && (
+                <button onClick={() => removeZone(zoneIdx)} style={{ fontSize: 10 }} title="remove this zone">
+                  ✕ remove zone
+                </button>
+              )}
+            </div>
+          )}
         </div>
         {!isFlex && (
           <div
@@ -307,6 +356,9 @@ export default function App() {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => addZone('end')} style={{ fontFamily: 'var(--font-pixel)', fontSize: 8, padding: '5px 8px', letterSpacing: 1 }} title="add a zone">
+            + ZONE
+          </button>
           <button
             onClick={() => setSettingsOpen(true)}
             style={{ fontFamily: 'var(--font-pixel)', fontSize: 8, padding: '5px 8px', letterSpacing: 1 }}
@@ -330,9 +382,11 @@ export default function App() {
           prune repos, set your vault path, and tune the primary directive. Restart after editing.
         </div>
       )}
-      {zones.map((_, i) => (
-        <Fragment key={i}>{renderZone(i)}</Fragment>
-      ))}
+      <div style={{ display: 'contents' }}>
+        {zones.map((_, i) => (
+          <Fragment key={i}>{renderZone(i)}</Fragment>
+        ))}
+      </div>
     </div>
     {settingsOpen && <SettingsPanel snap={snap} onClose={() => setSettingsOpen(false)} />}
     </>

@@ -167,7 +167,7 @@ export function SettingsPanel({ snap, onClose }: { snap: HudSnapshot; onClose: (
         <div style={row}>
           <span style={{ ...label, width: 70 }}>LAYOUT</span>
           <span className="dim" style={{ fontSize: 10 }}>
-            hover a panel and drag its ⠿ grip to rearrange the columns
+            drag a panel's ⠿ grip to move it between zones, or use + ZONE to add one
           </span>
         </div>
 
