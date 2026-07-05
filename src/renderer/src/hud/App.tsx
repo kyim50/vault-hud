@@ -133,12 +133,14 @@ export default function App() {
   if (!snap) return <p style={{ padding: 16 }}>booting…</p>
 
   const zones = localLayout ?? resolveLayout(snap.ui.layout, VALID_IDS)
-  const geo = localGeometry ?? resolveGeometry(snap.ui.geometry, zones.length)
+  const coreZone = zones.findIndex((z) => z.includes('core'))
+
+  const geo = localGeometry ?? resolveGeometry(snap.ui.geometry, zones.length, coreZone)
 
   const startResize = (zoneIdx: number, e: ReactMouseEvent): void => {
     e.preventDefault()
     draggingRef.current = true
-    const base = localGeometry ?? resolveGeometry(snap.ui.geometry, zones.length)
+    const base = localGeometry ?? resolveGeometry(snap.ui.geometry, zones.length, coreZone)
     const startX = e.clientX
     const startW = base.zoneWidths[zoneIdx]
     const [min, max] = GEOMETRY_BOUNDS.zoneWidth
@@ -185,14 +187,9 @@ export default function App() {
     })
   }
 
-  const addZone = (side: 'start' | 'end'): void => {
-    if (side === 'start') {
-      // prepend: new zone takes index 0, every existing zone (and the flex one) shifts right by 1
-      applyZones([[], ...zones], [260, ...geo.zoneWidths], geo.flexZone + 1)
-    } else {
-      // append: existing indices unchanged, new zone's width goes on the end
-      applyZones([...zones, []], [...geo.zoneWidths, 260], geo.flexZone)
-    }
+  const addZone = (): void => {
+    // append an empty zone at the end — existing indices and the flex zone are unaffected
+    applyZones([...zones, []], [...geo.zoneWidths, 260], geo.flexZone)
   }
 
   const removeZone = (zoneIdx: number): void => {
@@ -361,7 +358,7 @@ export default function App() {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => addZone('end')} style={{ fontFamily: 'var(--font-pixel)', fontSize: 8, padding: '5px 8px', letterSpacing: 1 }} title="add a zone">
+          <button onClick={addZone} style={{ fontFamily: 'var(--font-pixel)', fontSize: 8, padding: '5px 8px', letterSpacing: 1 }} title="add a zone">
             + ZONE
           </button>
           <button

@@ -25,7 +25,7 @@ export function resolveCoreMax(cfg: GeometryConfig | undefined): number {
   return clampNum(cfg?.coreMax, 560, GEOMETRY_BOUNDS.coreMax[0], GEOMETRY_BOUNDS.coreMax[1])
 }
 
-export function resolveGeometry(cfg: GeometryConfig | undefined, zoneCount: number): ResolvedGeometry {
+export function resolveGeometry(cfg: GeometryConfig | undefined, zoneCount: number, coreZone = -1): ResolvedGeometry {
   const count = Math.max(1, Math.floor(zoneCount) || 1)
   const legacy = typeof cfg?.leftWidth === 'number' || typeof cfg?.rightWidth === 'number'
 
@@ -42,7 +42,9 @@ export function resolveGeometry(cfg: GeometryConfig | undefined, zoneCount: numb
       ? Math.floor(cfg.flexZone)
       : legacy
         ? 1
-        : Math.floor(count / 2)
+        : coreZone >= 0
+          ? coreZone
+          : Math.floor(count / 2)
   const flexZone = Math.max(0, Math.min(count - 1, rawFlex))
 
   return { zoneWidths, flexZone, coreMax: resolveCoreMax(cfg) }

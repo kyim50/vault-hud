@@ -50,4 +50,12 @@ describe('resolveGeometry', () => {
     expect(GEOMETRY_BOUNDS.zoneWidth).toEqual([180, 460])
     expect(GEOMETRY_BOUNDS.coreMax).toEqual([360, 1000])
   })
+
+  it('default flexZone follows the core zone hint when given', () => {
+    expect(resolveGeometry({ zoneWidths: [200, 200, 200] }, 3, 0).flexZone).toBe(0)
+  })
+
+  it('explicit flexZone still wins over the core-zone hint', () => {
+    expect(resolveGeometry({ flexZone: 2 }, 3, 0).flexZone).toBe(2)
+  })
 })
