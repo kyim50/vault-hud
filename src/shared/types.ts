@@ -57,6 +57,12 @@ export interface SceneConfig {
   nap?: string // scene shown after 90min idle
 }
 
+export interface GeometryConfig {
+  leftWidth?: number // px, left panel column
+  rightWidth?: number // px, right panel column
+  coreMax?: number // px, Core canvas max width
+}
+
 export type Density = 'compact' | 'cozy' | 'airy'
 export interface ThemeColors {
   bg?: string
@@ -93,6 +99,7 @@ export interface UiConfig {
   modules?: Record<string, ModuleConfig> // per-module rice slice: enable + options
   themes?: Record<string, ThemeDef> // inline user themes (folder themes merge over these)
   scenes?: SceneConfig
+  geometry?: GeometryConfig
 }
 
 export interface CustomSprite {
