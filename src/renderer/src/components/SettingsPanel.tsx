@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { CustomSprite, HudSnapshot } from '@shared/types'
 import { crunchImageData } from '../lib/quantize'
 import { BUILTINS } from '../theme/builtins'
+import { ROTATION_DEFAULT } from '../lib/resolveScenes'
 
 // Settings overlay: theme, frame critters, repos, and the Sprite Studio —
 // drop an image, it gets crunched into an 8-bit sprite that keeps the
@@ -83,6 +84,54 @@ export function SettingsPanel({ snap, onClose }: { snap: HudSnapshot; onClose: (
               {snap.ui.theme === name ? '● ' : '○ '}{name}
             </button>
           ))}
+        </div>
+
+        <div style={row}>
+          <span style={{ ...label, width: 70 }}>SCENES</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {ROTATION_DEFAULT.map((name) => {
+              const rotation = snap.ui.scenes?.rotation ?? ROTATION_DEFAULT
+              const on = rotation.includes(name)
+              const toggle = (): void => {
+                const set = new Set(rotation)
+                if (on) set.delete(name)
+                else set.add(name)
+                const next = ROTATION_DEFAULT.filter((n) => set.has(n))
+                if (next.length === 0) return // never leave the Core with nothing to show
+                window.vault.updateConfig({ ui: { scenes: { ...snap.ui.scenes, rotation: next } } })
+              }
+              return (
+                <button key={name} onClick={toggle} style={{ color: on ? 'var(--clay)' : 'var(--ink)', fontSize: 10 }}>
+                  {on ? '● ' : '○ '}{name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div style={row}>
+          <span style={{ ...label, width: 70 }}>SPEED</span>
+          <button
+            onClick={() =>
+              window.vault.updateConfig({
+                ui: { scenes: { ...snap.ui.scenes, intervalSec: Math.max(3, (snap.ui.scenes?.intervalSec ?? 22) - 4) } }
+              })
+            }
+            style={{ fontSize: 10 }}
+          >
+            −
+          </button>
+          <span className="dim" style={{ fontSize: 10 }}>{snap.ui.scenes?.intervalSec ?? 22}s per scene</span>
+          <button
+            onClick={() =>
+              window.vault.updateConfig({
+                ui: { scenes: { ...snap.ui.scenes, intervalSec: Math.min(600, (snap.ui.scenes?.intervalSec ?? 22) + 4) } }
+              })
+            }
+            style={{ fontSize: 10 }}
+          >
+            +
+          </button>
         </div>
 
         <div style={row}>
