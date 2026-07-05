@@ -1,5 +1,14 @@
-import { useEffect, useLayoutEffect, useState, type DragEvent, type ReactNode } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode
+} from 'react'
 import type { PanelLayout } from '@shared/types'
+import { resolveGeometry, GEOMETRY_BOUNDS, type ResolvedGeometry } from '../lib/resolveGeometry'
 import { useSnapshot } from '../lib/useSnapshot'
 import { Panel } from '../components/Panel'
 import { VitalsPanel } from '../components/VitalsPanel'
@@ -75,6 +84,9 @@ export default function App() {
   const [drag, setDrag] = useState<string | null>(null)
   const [armed, setArmed] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
+  const [localGeometry, setLocalGeometry] = useState<ResolvedGeometry | null>(null)
+  const draggingRef = useRef(false)
+  const dragValueRef = useRef<ResolvedGeometry | null>(null)
   useLayoutEffect(() => {
     if (!snap) return
     try {
@@ -93,9 +105,42 @@ export default function App() {
   useEffect(() => {
     if (snap) lofi.apply(snap.ui.audio)
   }, [snap?.ui.audio?.mode, snap?.ui.audio?.volume])
+  // once a drag or a Settings change lands in the snapshot, the optimistic
+  // local value yields to config (guarded so a mid-drag snapshot doesn't interrupt)
+  useEffect(() => {
+    if (!draggingRef.current) setLocalGeometry(null)
+  }, [snap?.ui.geometry?.leftWidth, snap?.ui.geometry?.rightWidth, snap?.ui.geometry?.coreMax])
   if (!snap) return <p style={{ padding: 16 }}>booting…</p>
 
   const layout = localLayout ?? sanitizeLayout(snap.ui.layout)
+
+  const geo = localGeometry ?? resolveGeometry(snap.ui.geometry)
+
+  const startResize = (side: 'left' | 'right', e: ReactMouseEvent): void => {
+    e.preventDefault()
+    draggingRef.current = true
+    const base = localGeometry ?? resolveGeometry(snap.ui.geometry)
+    const startX = e.clientX
+    const startW = side === 'left' ? base.leftWidth : base.rightWidth
+    const [min, max] = side === 'left' ? GEOMETRY_BOUNDS.leftWidth : GEOMETRY_BOUNDS.rightWidth
+    const onMove = (ev: MouseEvent): void => {
+      const delta = ev.clientX - startX
+      const raw = side === 'left' ? startW + delta : startW - delta // drag inward widens the column
+      const w = Math.max(min, Math.min(max, raw))
+      const next: ResolvedGeometry = { ...base, [side === 'left' ? 'leftWidth' : 'rightWidth']: w }
+      dragValueRef.current = next
+      setLocalGeometry(next)
+    }
+    const onUp = (): void => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      draggingRef.current = false
+      const v = dragValueRef.current
+      if (v) window.vault.updateConfig({ ui: { geometry: { ...snap.ui.geometry, leftWidth: v.leftWidth, rightWidth: v.rightWidth } } })
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
 
   const move = (dragId: string, col: 'left' | 'right', before?: string): void => {
     const left = layout.left.filter((id) => id !== dragId)
@@ -109,30 +154,32 @@ export default function App() {
   }
 
   const renderColumn = (col: 'left' | 'right'): ReactNode => (
-    <div
-      onDragOver={(e) => {
-        if (drag) {
+    <div style={{ position: 'relative', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <div
+        onDragOver={(e) => {
+          if (drag) {
+            e.preventDefault()
+            setOver(`col:${col}`)
+          }
+        }}
+        onDragLeave={() => setOver(null)}
+        onDrop={(e) => {
           e.preventDefault()
-          setOver(`col:${col}`)
-        }
-      }}
-      onDragLeave={() => setOver(null)}
-      onDrop={(e) => {
-        e.preventDefault()
-        if (drag) move(drag, col)
-        setOver(null)
-      }}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        minHeight: 0,
-        overflowY: 'auto',
-        outline: over === `col:${col}` ? '1px dashed var(--clay)' : 'none',
-        outlineOffset: 2
-      }}
-    >
-      {layout[col].map((id) => {
+          if (drag) move(drag, col)
+          setOver(null)
+        }}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+          minHeight: 0,
+          flex: 1,
+          overflowY: 'auto',
+          outline: over === `col:${col}` ? '1px dashed var(--clay)' : 'none',
+          outlineOffset: 2
+        }}
+      >
+        {layout[col].map((id) => {
         const mod = MODULES[id]
         if (!mod) return null
         const { enabled, options } = resolveModule(mod.defaults, snap.ui.modules?.[id])
@@ -188,6 +235,13 @@ export default function App() {
           </div>
         )
       })}
+      </div>
+      <div
+        className="resize-handle"
+        title="drag to resize"
+        onMouseDown={(e) => startResize(col, e)}
+        style={{ position: 'absolute', top: 0, bottom: 0, width: 8, [col === 'left' ? 'right' : 'left']: -8, cursor: 'col-resize', zIndex: 5 }}
+      />
     </div>
   )
 
@@ -201,7 +255,7 @@ export default function App() {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '280px 1fr 300px',
+        gridTemplateColumns: `${geo.leftWidth}px 1fr ${geo.rightWidth}px`,
         gridTemplateRows: snap.configCreated ? '40px auto 1fr' : '40px 1fr',
         gap: 8,
         height: '100vh',
@@ -278,6 +332,7 @@ export default function App() {
             graph={snap.graph}
             chart={chart}
             scenes={snap.ui.scenes}
+            maxWidth={geo.coreMax}
           />
           <div style={{ borderTop: '1px dotted var(--line-soft)', paddingTop: 8 }}>
             <PrimaryDirective {...snap.primary} />

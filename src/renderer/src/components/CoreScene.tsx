@@ -911,7 +911,8 @@ export function CoreScene({
   loot,
   graph,
   chart,
-  scenes
+  scenes,
+  maxWidth = 560
 }: {
   usagePercent: number
   busy: boolean
@@ -920,6 +921,7 @@ export function CoreScene({
   graph: LinkGraph
   chart: boolean
   scenes?: SceneConfig
+  maxWidth?: number
 }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const busyRef = useRef(busy)
@@ -1128,7 +1130,7 @@ export function CoreScene({
             focusUntil.current = performance.now() + 2500
           }
         }}
-        style={{ width: '100%', maxWidth: 560, imageRendering: 'pixelated', aspectRatio: '16/9' }}
+        style={{ width: '100%', maxWidth, imageRendering: 'pixelated', aspectRatio: '16/9' }}
       />
     </div>
   )
