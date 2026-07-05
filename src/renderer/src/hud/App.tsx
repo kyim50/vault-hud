@@ -134,12 +134,14 @@ export default function App() {
     const onUp = (): void => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('blur', onUp)
       draggingRef.current = false
       const v = dragValueRef.current
       if (v) window.vault.updateConfig({ ui: { geometry: { ...snap.ui.geometry, leftWidth: v.leftWidth, rightWidth: v.rightWidth } } })
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
+    window.addEventListener('blur', onUp)
   }
 
   const move = (dragId: string, col: 'left' | 'right', before?: string): void => {
