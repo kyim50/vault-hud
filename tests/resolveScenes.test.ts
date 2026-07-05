@@ -29,4 +29,12 @@ describe('resolveScenes', () => {
     expect(resolveScenes({ busy: 'nope' }, VALID, ROTATION_DEFAULT, 12).busy).toBe('disco')
     expect(resolveScenes({ nap: 'nope' }, VALID, ROTATION_DEFAULT, 12).nap).toBe('nap')
   })
+  it('fail-soft: a non-array rotation falls back to defaults', () => {
+    expect(resolveScenes({ rotation: 'meadow' as unknown as string[] }, VALID, ROTATION_DEFAULT, 12).rotation).toEqual(ROTATION_DEFAULT)
+    expect(resolveScenes({ rotation: 42 as unknown as string[] }, VALID, ROTATION_DEFAULT, 12).rotation).toEqual(ROTATION_DEFAULT)
+  })
+  it('fail-soft: a non-numeric or NaN intervalSec falls back to 22s (264 frames)', () => {
+    expect(resolveScenes({ intervalSec: '20s' as unknown as number }, VALID, ROTATION_DEFAULT, 12).intervalFrames).toBe(264)
+    expect(resolveScenes({ intervalSec: NaN }, VALID, ROTATION_DEFAULT, 12).intervalFrames).toBe(264)
+  })
 })

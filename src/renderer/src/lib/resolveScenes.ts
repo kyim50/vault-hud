@@ -19,9 +19,10 @@ export function resolveScenes(
   fps: number
 ): ResolvedScenes {
   const valid = new Set(validNames)
-  const requested = (cfg?.rotation ?? []).filter((n) => valid.has(n))
+  const requested = (Array.isArray(cfg?.rotation) ? cfg.rotation : []).filter((n) => valid.has(n))
   const rotation = requested.length > 0 ? requested : defaults
-  const sec = Math.max(3, Math.min(600, cfg?.intervalSec ?? 22))
+  const rawSec = typeof cfg?.intervalSec === 'number' && Number.isFinite(cfg.intervalSec) ? cfg.intervalSec : 22
+  const sec = Math.max(3, Math.min(600, rawSec))
   return {
     rotation,
     intervalFrames: Math.round(sec * fps),
