@@ -174,29 +174,34 @@ export default function App() {
     window.vault.updateConfig({ ui: { layout: { zones: next } } })
   }
 
-  const writeLayout = (next: string[][]): void => {
+  // add/remove a zone, keeping zoneWidths + flexZone aligned with the new zone
+  // indices; applied optimistically (local state) so the flex column doesn't
+  // flash the wrong width for a frame before the config round-trip lands
+  const applyZones = (next: string[][], widths: number[], flexZone: number): void => {
     setLocalLayout(next)
-    window.vault.updateConfig({ ui: { layout: { zones: next } } })
+    setLocalGeometry({ zoneWidths: widths, flexZone, coreMax: geo.coreMax })
+    window.vault.updateConfig({
+      ui: { layout: { zones: next }, geometry: { ...snap.ui.geometry, zoneWidths: widths, flexZone } }
+    })
   }
 
   const addZone = (side: 'start' | 'end'): void => {
-    const next = side === 'start' ? [[], ...zones] : [...zones, []]
-    // adding a zone before the flex zone shifts it right by one — keep the same zone flexing
     if (side === 'start') {
-      const g = localGeometry ?? geo
-      window.vault.updateConfig({ ui: { geometry: { ...snap.ui.geometry, flexZone: g.flexZone + 1 } } })
+      // prepend: new zone takes index 0, every existing zone (and the flex one) shifts right by 1
+      applyZones([[], ...zones], [260, ...geo.zoneWidths], geo.flexZone + 1)
+    } else {
+      // append: existing indices unchanged, new zone's width goes on the end
+      applyZones([...zones, []], [...geo.zoneWidths, 260], geo.flexZone)
     }
-    writeLayout(next)
   }
 
   const removeZone = (zoneIdx: number): void => {
     if (zones.length <= 1) return // never remove the last zone
     const next = zones.filter((_, i) => i !== zoneIdx)
-    const g = localGeometry ?? geo
+    const widths = geo.zoneWidths.filter((_, i) => i !== zoneIdx)
     // keep the flex zone pointing at the same logical column after the splice
-    const nextFlex = Math.max(0, Math.min(next.length - 1, zoneIdx < g.flexZone ? g.flexZone - 1 : g.flexZone))
-    window.vault.updateConfig({ ui: { geometry: { ...snap.ui.geometry, flexZone: nextFlex } } })
-    writeLayout(next)
+    const flexZone = Math.max(0, Math.min(next.length - 1, zoneIdx < geo.flexZone ? geo.flexZone - 1 : geo.flexZone))
+    applyZones(next, widths, flexZone)
   }
 
   const renderZone = (zoneIdx: number): ReactNode => {
