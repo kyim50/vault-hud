@@ -1,4 +1,4 @@
-import { useEffect, useState, type DragEvent, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useState, type DragEvent, type ReactNode } from 'react'
 import type { PanelLayout } from '@shared/types'
 import { useSnapshot } from '../lib/useSnapshot'
 import { Panel } from '../components/Panel'
@@ -75,12 +75,19 @@ export default function App() {
   const [drag, setDrag] = useState<string | null>(null)
   const [armed, setArmed] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!snap) return
-    const defs = { ...BUILTINS, ...snap.userThemes }
-    const resolved = resolve(defs[snap.ui.theme] ?? BUILTINS.terminal)
-    applyTheme(resolved)
-    setSceneColors(resolved)
+    try {
+      const defs = { ...BUILTINS, ...snap.userThemes }
+      const resolved = resolve(defs[snap.ui.theme] ?? BUILTINS.terminal)
+      applyTheme(resolved)
+      setSceneColors(resolved)
+    } catch {
+      // malformed user theme (e.g. a non-string color value) — never blank the HUD
+      const fallback = resolve(BUILTINS.terminal)
+      applyTheme(fallback)
+      setSceneColors(fallback)
+    }
   }, [snap?.ui.theme, snap?.userThemes])
   // ambient synth follows the persisted audio config
   useEffect(() => {

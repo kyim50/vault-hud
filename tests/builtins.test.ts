@@ -14,6 +14,10 @@ describe('builtins', () => {
     expect(t.mascotBody).toBe('#d97757')
     expect(t.mascotDark).toBe('#b85c3f')
     expect(t.mascotBodyLight).toBe('#e8a284')
+    expect(t.accent).toBe('#e8e6e3')
+    expect(t.accentDim).toBe('#8f8f8f')
+    expect(t.line).toBe('#e8e6e3')
+    expect(t.danger).toBe('#ff6e4e')
   })
   it('paper resolves to the current paper CSS values', () => {
     const p = resolve(BUILTINS.paper).colors
@@ -21,5 +25,9 @@ describe('builtins', () => {
     expect(p.ink).toBe('#17160f')
     expect(p.inkDim).toBe('#8d8a7a')
     expect(p.lineSoft).toBe('#dcd9ca')
+    expect(p.accent).toBe('#17160f')
+    expect(p.accentDim).toBe('#8d8a7a')
+    expect(p.line).toBe('#17160f')
+    expect(p.danger).toBe('#ff6e4e')
   })
 })

@@ -10,6 +10,7 @@ export const BUILTINS: Record<string, ThemeDef> = {
       inkDim: '#8f8f8f',
       lineSoft: '#3a3a3a',
       accent: '#e8e6e3',
+      accentDim: '#8f8f8f',
       mascotBody: '#d97757',
       mascotDark: '#b85c3f',
       mascotBodyLight: '#e8a284',
@@ -28,6 +29,7 @@ export const BUILTINS: Record<string, ThemeDef> = {
       inkDim: '#8d8a7a',
       lineSoft: '#dcd9ca',
       accent: '#17160f',
+      accentDim: '#8d8a7a',
       mascotBody: '#d97757'
     },
     density: 'cozy'
