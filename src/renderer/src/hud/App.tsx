@@ -14,6 +14,7 @@ import { HudFrame } from '../components/HudFrame'
 import { SkillsPanel } from '../components/SkillsPanel'
 import { TotemPanel } from '../components/TotemPanel'
 import { SettingsPanel } from '../components/SettingsPanel'
+import { VaultfetchPanel, DEFAULT_FETCH_OPTIONS, type FetchOptions } from '../components/VaultfetchPanel'
 import { lofi } from '../lib/audio'
 import type { HudModule } from '../modules/types'
 import { resolveModule } from '../modules/resolve'
@@ -22,6 +23,7 @@ import { resolveModule } from '../modules/resolve'
 // ⠿ grip); the order persists in config as ui.layout, and each module's
 // enabled/options come from config.ui.modules[id] (see resolveModule)
 const MODULES: Record<string, HudModule<any>> = {
+  fetch: { id: 'fetch', defaults: DEFAULT_FETCH_OPTIONS, render: (s, o: FetchOptions) => <VaultfetchPanel snap={s} opts={o} /> },
   vitals: { id: 'vitals', defaults: {}, render: (s) => <VitalsPanel repos={s.repos} usage={s.usage} audio={s.ui.audio} /> },
   directives: { id: 'directives', defaults: {}, render: (s) => <DirectivesPanel directives={s.directives} /> },
   brain: { id: 'brain', defaults: {}, render: (s) => <SecondBrainPanel recent={s.brain.recent} resurfaced={s.brain.resurfaced} /> },
@@ -31,7 +33,7 @@ const MODULES: Record<string, HudModule<any>> = {
   totem: { id: 'totem', defaults: {}, render: (s) => <TotemPanel sprite={s.sprites.find((sp) => sp.use === 'totem')} /> }
 }
 const DEFAULT_LAYOUT: PanelLayout = {
-  left: ['vitals', 'directives', 'brain'],
+  left: ['fetch', 'vitals', 'directives', 'brain'],
   right: ['deck', 'schedule', 'totem', 'skills']
 }
 // these two soak up leftover column height; the rest hug their content
