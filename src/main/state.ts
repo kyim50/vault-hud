@@ -44,7 +44,8 @@ export class HudState extends EventEmitter {
       configCreated,
       configPath,
       bootAt: BOOT_AT,
-      quotes: []
+      quotes: [],
+      userThemes: {}
     }
     this.runner.on('status', (s) => {
       this.snapshot.commands = this.runner.list()

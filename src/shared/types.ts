@@ -50,12 +50,41 @@ export interface ModuleConfig {
   options?: Record<string, unknown>
 }
 
+export type Density = 'compact' | 'cozy' | 'airy'
+export interface ThemeColors {
+  bg?: string
+  surface?: string
+  ink?: string
+  inkDim?: string
+  line?: string
+  lineSoft?: string
+  accent?: string
+  accentDim?: string
+  mascotBody?: string
+  mascotBodyLight?: string
+  mascotDark?: string
+  mascotEye?: string
+  mascotMuzzle?: string
+  danger?: string
+}
+export interface ThemeFonts {
+  mono?: string
+  pixel?: string
+}
+export interface ThemeDef {
+  name?: string
+  colors?: ThemeColors
+  fonts?: ThemeFonts
+  density?: Density
+}
+
 export interface UiConfig {
-  theme: 'terminal' | 'paper'
+  theme: string // active theme name: a built-in or a user theme
   parade: boolean // critters patrol the HUD frame
   layout?: PanelLayout
   audio?: AudioConfig
   modules?: Record<string, ModuleConfig> // per-module rice slice: enable + options
+  themes?: Record<string, ThemeDef> // inline user themes (folder themes merge over these)
 }
 
 export interface CustomSprite {
@@ -160,4 +189,5 @@ export interface HudSnapshot {
   configPath: string
   bootAt: number // main-process start time — uptime source
   quotes: string[] // defaults merged with a vault Quotes.md when present
+  userThemes: Record<string, ThemeDef> // config.ui.themes merged with ~/.vault-hud/themes/*.json
 }
