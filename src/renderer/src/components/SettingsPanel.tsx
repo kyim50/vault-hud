@@ -3,7 +3,7 @@ import type { CustomSprite, HudSnapshot } from '@shared/types'
 import { crunchImageData } from '../lib/quantize'
 import { BUILTINS } from '../theme/builtins'
 import { ROTATION_DEFAULT } from '../lib/resolveScenes'
-import { resolveGeometry, GEOMETRY_BOUNDS } from '../lib/resolveGeometry'
+import { resolveCoreMax, GEOMETRY_BOUNDS } from '../lib/resolveGeometry'
 
 // Settings overlay: theme, frame critters, repos, and the Sprite Studio —
 // drop an image, it gets crunched into an 8-bit sprite that keeps the
@@ -137,26 +137,22 @@ export function SettingsPanel({ snap, onClose }: { snap: HudSnapshot; onClose: (
 
         <div style={row}>
           <span style={{ ...label, width: 70 }}>SIZE</span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {([
-              ['leftWidth', 'left'],
-              ['rightWidth', 'right'],
-              ['coreMax', 'core']
-            ] as const).map(([field, name]) => {
-              const g = resolveGeometry(snap.ui.geometry)
-              const [min, max] = GEOMETRY_BOUNDS[field]
-              const set = (v: number): void =>
-                window.vault.updateConfig({ ui: { geometry: { ...snap.ui.geometry, [field]: Math.max(min, Math.min(max, v)) } } })
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {(() => {
+              const [min, max] = GEOMETRY_BOUNDS.coreMax
+              const v = resolveCoreMax(snap.ui.geometry)
+              const set = (n: number): void =>
+                window.vault.updateConfig({ ui: { geometry: { ...snap.ui.geometry, coreMax: Math.max(min, Math.min(max, n)) } } })
               return (
-                <span key={field} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <button onClick={() => set(g[field] - 20)} style={{ fontSize: 10 }}>−</button>
-                  <span className="dim" style={{ fontSize: 10, width: 88 }}>{name} {g[field]}px</span>
-                  <button onClick={() => set(g[field] + 20)} style={{ fontSize: 10 }}>+</button>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button onClick={() => set(v - 20)} style={{ fontSize: 10 }}>−</button>
+                  <span className="dim" style={{ fontSize: 10, minWidth: 64, textAlign: 'center' }}>core {v}px</span>
+                  <button onClick={() => set(v + 20)} style={{ fontSize: 10 }}>+</button>
                 </span>
               )
-            })}
+            })()}
             <button onClick={() => window.vault.updateConfig({ ui: { geometry: {} } })} style={{ fontSize: 10 }}>
-              ○ reset to defaults
+              reset
             </button>
           </div>
         </div>
