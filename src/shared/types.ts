@@ -32,10 +32,10 @@ export interface VaultHudConfig {
   ui: UiConfig
 }
 
-// panel ids for the two side columns, in display order (drag to rearrange)
 export interface PanelLayout {
-  left: string[]
-  right: string[]
+  zones?: string[][] // ordered zones, each an ordered list of module ids
+  left?: string[] // legacy (pre-zones) — migrated to zones, then ignored
+  right?: string[] // legacy
 }
 
 export type AudioMode = 'off' | 'hum' | 'hiss'
@@ -58,9 +58,11 @@ export interface SceneConfig {
 }
 
 export interface GeometryConfig {
-  leftWidth?: number // px, left panel column
-  rightWidth?: number // px, right panel column
+  zoneWidths?: number[] // px per zone, index-aligned with layout.zones
+  flexZone?: number // index of the zone that soaks leftover width (the `1fr`)
   coreMax?: number // px, Core canvas max width
+  leftWidth?: number // legacy — migrated to zoneWidths
+  rightWidth?: number // legacy
 }
 
 export type Density = 'compact' | 'cozy' | 'airy'

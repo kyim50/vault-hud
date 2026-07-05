@@ -62,8 +62,8 @@ function sanitizeLayout(l?: PanelLayout): PanelLayout {
     )
   const left = clean(l?.left)
   const right = clean(l?.right)
-  for (const id of DEFAULT_LAYOUT.left) if (!seen.has(id)) left.push(id)
-  for (const id of DEFAULT_LAYOUT.right) if (!seen.has(id)) right.push(id)
+  for (const id of DEFAULT_LAYOUT.left ?? []) if (!seen.has(id)) left.push(id)
+  for (const id of DEFAULT_LAYOUT.right ?? []) if (!seen.has(id)) right.push(id)
   return { left, right }
 }
 
@@ -145,8 +145,8 @@ export default function App() {
   }
 
   const move = (dragId: string, col: 'left' | 'right', before?: string): void => {
-    const left = layout.left.filter((id) => id !== dragId)
-    const right = layout.right.filter((id) => id !== dragId)
+    const left = (layout.left ?? []).filter((id) => id !== dragId)
+    const right = (layout.right ?? []).filter((id) => id !== dragId)
     const arr = col === 'left' ? left : right
     const at = before ? arr.indexOf(before) : -1
     arr.splice(at < 0 ? arr.length : at, 0, dragId)
@@ -181,7 +181,7 @@ export default function App() {
           outlineOffset: 2
         }}
       >
-        {layout[col].map((id) => {
+        {(layout[col] ?? []).map((id) => {
         const mod = MODULES[id]
         if (!mod) return null
         const { enabled, options } = resolveModule(mod.defaults, snap.ui.modules?.[id])
