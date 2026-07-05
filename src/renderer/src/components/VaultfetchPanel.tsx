@@ -4,6 +4,7 @@ import { Panel } from './Panel'
 import { PANDA_MINI, DEFAULT_PALETTE } from '../lib/panda'
 import { spriteToHalfBlocks } from '../lib/blockart'
 import { fetchLines, type FetchLineId } from '../lib/fetchLines'
+import { getActiveTheme } from '../theme/apply'
 
 export interface FetchOptions {
   lines: FetchLineId[]
@@ -18,15 +19,6 @@ export const DEFAULT_FETCH_OPTIONS: FetchOptions = {
   showSwatches: true,
   quoteRotateSec: 20
 }
-
-const SWATCHES = [
-  DEFAULT_PALETTE.body,
-  DEFAULT_PALETTE.dark,
-  DEFAULT_PALETTE.muzzle,
-  DEFAULT_PALETTE.eye,
-  '#e8e6e3',
-  '#9a9a9a'
-]
 
 export function VaultfetchPanel({ snap, opts }: { snap: HudSnapshot; opts: FetchOptions }) {
   // 1s tick so uptime stays live; a separate counter rotates the quote
@@ -44,6 +36,11 @@ export function VaultfetchPanel({ snap, opts }: { snap: HudSnapshot; opts: Fetch
     )
     return () => clearInterval(t)
   }, [opts.quoteRotateSec, snap.quotes.length])
+
+  const at = getActiveTheme()
+  const SWATCHES = at
+    ? [at.colors.mascotBody, at.colors.mascotDark, at.colors.mascotMuzzle, at.colors.mascotEye, at.colors.ink, at.colors.inkDim]
+    : [DEFAULT_PALETTE.body, DEFAULT_PALETTE.dark, DEFAULT_PALETTE.muzzle, DEFAULT_PALETTE.eye, '#e8e6e3', '#9a9a9a']
 
   const logo = spriteToHalfBlocks(PANDA_MINI, DEFAULT_PALETTE)
   const lines = fetchLines(snap, Date.now(), opts.lines)

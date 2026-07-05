@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { CustomSprite, HudSnapshot } from '@shared/types'
 import { crunchImageData } from '../lib/quantize'
+import { BUILTINS } from '../theme/builtins'
 
 // Settings overlay: theme, frame critters, repos, and the Sprite Studio —
 // drop an image, it gets crunched into an 8-bit sprite that keeps the
@@ -73,13 +74,13 @@ export function SettingsPanel({ snap, onClose }: { snap: HudSnapshot; onClose: (
 
         <div style={row}>
           <span style={{ ...label, width: 70 }}>THEME</span>
-          {(['terminal', 'paper'] as const).map((t) => (
+          {Array.from(new Set([...Object.keys(BUILTINS), ...Object.keys(snap.userThemes)])).map((name) => (
             <button
-              key={t}
-              onClick={() => window.vault.updateConfig({ ui: { theme: t } })}
-              style={{ color: snap.ui.theme === t ? 'var(--clay)' : 'var(--ink)', fontSize: 10 }}
+              key={name}
+              onClick={() => window.vault.updateConfig({ ui: { theme: name } })}
+              style={{ color: snap.ui.theme === name ? 'var(--clay)' : 'var(--ink)', fontSize: 10 }}
             >
-              {snap.ui.theme === t ? '● ' : '○ '}{t}
+              {snap.ui.theme === name ? '● ' : '○ '}{name}
             </button>
           ))}
         </div>
