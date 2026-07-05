@@ -277,6 +277,7 @@ export default function App() {
             loot={snap.loot}
             graph={snap.graph}
             chart={chart}
+            scenes={snap.ui.scenes}
           />
           <div style={{ borderTop: '1px dotted var(--line-soft)', paddingTop: 8 }}>
             <PrimaryDirective {...snap.primary} />

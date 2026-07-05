@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react'
-import type { LinkGraph, Mood } from '@shared/types'
+import type { LinkGraph, Mood, SceneConfig } from '@shared/types'
 import { PANDA, PANDA_BODY_ROWS, PANDA_BUDDY, drawPanda } from '../lib/panda'
 import { sceneColors, scenePalette } from '../theme/sceneColors'
 import { layoutConstellation, hitStar, type Star } from '../lib/constellation'
 import { drawPixelText, measurePixelText } from '../lib/pixelfont'
 import { loadingPhase } from '../lib/loadingTransition'
+import { resolveScenes, ROTATION_DEFAULT } from '../lib/resolveScenes'
 
 // Halftone scene engine: the red panda living out rotating pixel scenes.
 // Dual-state canvas: hovering a Second Brain note dissolves the scene into
@@ -13,7 +14,6 @@ const W = 192
 const H = 108
 
 const FPS = 12
-const SCENE_FRAMES = 22 * FPS
 
 function hash(x: number, y: number): number {
   let h = (x * 374761393 + y * 668265263) | 0
@@ -29,6 +29,8 @@ function wander(f: number, min: number, max: number, speed: number, phase = 0): 
 }
 
 type Ctx = CanvasRenderingContext2D
+type SceneFn = (ctx: Ctx, f: number, blink: boolean) => void
+interface SceneDef { name: string; draw: SceneFn; horizon?: number }
 
 function drawWalker(ctx: Ctx, f: number, blink: boolean, x: number, groundY: number, moving: boolean): void {
   const bob = moving ? (Math.floor(f / 3) % 2) : (Math.floor(f / 8) % 2)
@@ -621,10 +623,20 @@ function sceneNap(ctx: Ctx, f: number, _blink: boolean): void {
   drawPixelText(ctx, 'TAKE A BREAK · NOTHING DONE IN 90M', cx, H - 9, { color: sceneColors.gray, align: 'center' })
 }
 
-const SCENES = [sceneMeadow, sceneSurf, sceneGarden, sceneDisco, sceneGlobe, sceneNight, sceneRain, sceneRooftop]
-const DISCO = 3
-// scenes with a walkable ground line — loot props furnish these
-const HORIZONS: Record<number, number> = { 0: 90, 2: 92, 3: 94, 5: 92, 6: 92, 7: 88 }
+// name-keyed registry: config references names, not fragile array indices.
+// horizon = walkable ground line for loot props (undefined = no ground scene).
+const SCENE_REGISTRY: Record<string, SceneDef> = {
+  meadow: { name: 'meadow', draw: sceneMeadow, horizon: 90 },
+  surf: { name: 'surf', draw: sceneSurf },
+  garden: { name: 'garden', draw: sceneGarden, horizon: 92 },
+  disco: { name: 'disco', draw: sceneDisco, horizon: 94 },
+  globe: { name: 'globe', draw: sceneGlobe },
+  night: { name: 'night', draw: sceneNight, horizon: 92 },
+  rain: { name: 'rain', draw: sceneRain, horizon: 92 },
+  rooftop: { name: 'rooftop', draw: sceneRooftop, horizon: 88 },
+  nap: { name: 'nap', draw: sceneNap }
+}
+const SCENE_NAMES = Object.keys(SCENE_REGISTRY)
 const TRANS_FRAMES = 30 // ~2.5s: dissolve out → loading beat → dissolve in
 
 // chunky ordered pixel dissolve: replace an `amount` (0..1) fraction of 4px
@@ -673,8 +685,8 @@ function drawLoadingTransition(
   fromCtx: Ctx,
   toCtx: Ctx,
   loadCtx: Ctx,
-  fromScene: number,
-  toScene: number,
+  fromDraw: SceneFn,
+  toDraw: SceneFn,
   frozenF: number,
   liveF: number,
   blink: boolean,
@@ -690,13 +702,13 @@ function drawLoadingTransition(
   if (phase === 'out') {
     // outgoing scene frozen at its last frame, dissolving toward loading
     fromCtx.clearRect(0, 0, W, H)
-    SCENES[fromScene](fromCtx, frozenF, false)
+    fromDraw(fromCtx, frozenF, false)
     ctx.drawImage(fromBuf, 0, 0)
     ditherBlocks(ctx, loadBuf, mix)
   } else {
     // loading dissolving toward the live incoming scene
     toCtx.clearRect(0, 0, W, H)
-    SCENES[toScene](toCtx, liveF, blink)
+    toDraw(toCtx, liveF, blink)
     ctx.drawImage(loadBuf, 0, 0)
     ditherBlocks(ctx, toBuf, mix)
   }
@@ -898,7 +910,8 @@ export function CoreScene({
   mood,
   loot,
   graph,
-  chart
+  chart,
+  scenes
 }: {
   usagePercent: number
   busy: boolean
@@ -906,6 +919,7 @@ export function CoreScene({
   loot: string[]
   graph: LinkGraph
   chart: boolean
+  scenes?: SceneConfig
 }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const busyRef = useRef(busy)
@@ -920,6 +934,9 @@ export function CoreScene({
   graphRef.current = graph
   const chartRef = useRef(chart)
   chartRef.current = chart
+  const scn = resolveScenes(scenes, SCENE_NAMES, ROTATION_DEFAULT, FPS)
+  const scnRef = useRef(scn)
+  scnRef.current = scn
 
   // constellation reveal state — driven by Second Brain hover events and by
   // the pointer being over the canvas itself (so you can travel to a star)
@@ -993,15 +1010,17 @@ export function CoreScene({
       canvas.style.cursor = dissolve > 0.9 && hoverStarRef.current >= 0 ? 'pointer' : 'default'
 
       // --- render the active scene into its offscreen (12fps stepping) ---
-      const slot = Math.floor(frame / SCENE_FRAMES)
-      const sceneIdx = busyRef.current ? DISCO : slot % SCENES.length
+      const sceneFrames = scnRef.current.intervalFrames
+      const rot = scnRef.current.rotation
+      const slot = Math.floor(frame / sceneFrames)
+      const entry = busyRef.current ? SCENE_REGISTRY[scnRef.current.busy] : SCENE_REGISTRY[rot[slot % rot.length]]
       const napping = !busyRef.current && moodRef.current === 'napping'
-      const inScene = tf - slot * SCENE_FRAMES
+      const inScene = tf - slot * sceneFrames
       if (dissolve < 1) {
         if (!napping && inScene < TRANS_FRAMES && slot > 0 && !busyRef.current) {
-          const prev = (slot - 1) % SCENES.length
+          const prevEntry = SCENE_REGISTRY[rot[(slot - 1) % rot.length]]
           const blinkEvery = usageRef.current > 80 ? 24 : 48
-          const frozenF = slot * SCENE_FRAMES - 1 // last frame of the outgoing scene
+          const frozenF = slot * sceneFrames - 1 // last frame of the outgoing scene
           drawLoadingTransition(
             sctx,
             bufFrom,
@@ -1010,8 +1029,8 @@ export function CoreScene({
             cFrom,
             cTo,
             cLoad,
-            prev,
-            sceneIdx,
+            prevEntry.draw,
+            entry.draw,
             frozenF,
             frame,
             frame % blinkEvery >= blinkEvery - 6,
@@ -1022,11 +1041,10 @@ export function CoreScene({
           const blinkEvery = usageRef.current > 80 ? 24 : 48
           sctx.clearRect(0, 0, W, H)
           if (napping) {
-            sceneNap(sctx, frame, false)
+            SCENE_REGISTRY[scnRef.current.nap].draw(sctx, frame, false)
           } else {
-            SCENES[sceneIdx](sctx, frame, frame % blinkEvery >= blinkEvery - 6)
-            const horizon = HORIZONS[sceneIdx]
-            if (horizon !== undefined) drawLoot(sctx, lootRef.current, horizon, frame)
+            entry.draw(sctx, frame, frame % blinkEvery >= blinkEvery - 6)
+            if (entry.horizon !== undefined) drawLoot(sctx, lootRef.current, entry.horizon, frame)
           }
           lastFrame = frame
         }
