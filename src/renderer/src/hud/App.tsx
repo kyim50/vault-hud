@@ -18,6 +18,10 @@ import { VaultfetchPanel, DEFAULT_FETCH_OPTIONS, type FetchOptions } from '../co
 import { lofi } from '../lib/audio'
 import type { HudModule } from '../modules/types'
 import { resolveModule } from '../modules/resolve'
+import { BUILTINS } from '../theme/builtins'
+import { resolve } from '../theme/resolve'
+import { applyTheme } from '../theme/apply'
+import { setSceneColors } from '../theme/sceneColors'
 
 // the two side columns render these modules in user-chosen order (drag the
 // ⠿ grip); the order persists in config as ui.layout, and each module's
@@ -72,8 +76,12 @@ export default function App() {
   const [armed, setArmed] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
   useEffect(() => {
-    if (snap) document.body.dataset.theme = snap.ui.theme
-  }, [snap?.ui.theme])
+    if (!snap) return
+    const defs = { ...BUILTINS, ...snap.userThemes }
+    const resolved = resolve(defs[snap.ui.theme] ?? BUILTINS.terminal)
+    applyTheme(resolved)
+    setSceneColors(resolved)
+  }, [snap?.ui.theme, snap?.userThemes])
   // ambient synth follows the persisted audio config
   useEffect(() => {
     if (snap) lofi.apply(snap.ui.audio)
