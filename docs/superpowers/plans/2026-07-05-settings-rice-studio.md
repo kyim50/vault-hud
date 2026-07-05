@@ -500,6 +500,10 @@ export function LayoutTab({ snap }: { snap: HudSnapshot }) {
   }
   const toggleModule = (id: string, on: boolean): void =>
     window.vault.updateConfig({ ui: { modules: { ...snap.ui.modules, [id]: { ...snap.ui.modules?.[id], enabled: on } } } })
+  const setCoreMax = (px: number): void => {
+    const [cmin, cmax] = GEOMETRY_BOUNDS.coreMax
+    window.vault.updateConfig({ ui: { geometry: { ...snap.ui.geometry, coreMax: Math.max(cmin, Math.min(cmax, px)) } } })
+  }
 
   const zoneNames = zones.map((_, i) => String(i))
   return (
@@ -540,10 +544,18 @@ export function LayoutTab({ snap }: { snap: HudSnapshot }) {
           })}
         </div>
       </Section>
+      <Section title="CORE SIZE">
+        <Row label="CORE">
+          <Stepper value={geo.coreMax} suffix="px" onDec={() => setCoreMax(geo.coreMax - 20)} onInc={() => setCoreMax(geo.coreMax + 20)} />
+          <button onClick={() => window.vault.updateConfig({ ui: { geometry: {} } })} style={{ fontSize: 10 }}>reset all sizes</button>
+        </Row>
+      </Section>
     </>
   )
 }
 ```
+
+(The **CORE SIZE** section restores the coreMax stepper from sub-project C's SIZE row — it caps the Core canvas width independent of its zone's width. "reset all sizes" clears `ui.geometry` back to defaults, exactly as the old reset did.)
 
 - [ ] **Step 2: Wire it into the shell**
 
