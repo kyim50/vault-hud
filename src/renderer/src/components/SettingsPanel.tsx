@@ -1,64 +1,14 @@
-import { useRef, useState } from 'react'
-import type { CustomSprite, HudSnapshot } from '@shared/types'
-import { crunchImageData } from '../lib/quantize'
-import { BUILTINS } from '../theme/builtins'
-import { ROTATION_DEFAULT } from '../lib/resolveScenes'
-import { resolveCoreMax, GEOMETRY_BOUNDS } from '../lib/resolveGeometry'
+import { useState } from 'react'
+import type { HudSnapshot } from '@shared/types'
+import { AppearanceTab } from './settings/AppearanceTab'
+import { ScenesTab } from './settings/ScenesTab'
+import { SpritesTab } from './settings/SpritesTab'
 
-// Settings overlay: theme, frame critters, repos, and the Sprite Studio —
-// drop an image, it gets crunched into an 8-bit sprite that keeps the
-// image's own palette (median-cut) with its backdrop stripped.
-
-function crunch(img: HTMLImageElement, size = 24): string[][] {
-  const c = document.createElement('canvas')
-  c.width = size
-  c.height = size
-  const ctx = c.getContext('2d')!
-  ctx.imageSmoothingEnabled = true
-  ctx.imageSmoothingQuality = 'high'
-  // cover-fit crop to square
-  const s = Math.min(img.width, img.height)
-  ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size)
-  return crunchImageData(ctx.getImageData(0, 0, size, size).data, size, size)
-}
-
-function SpritePreview({ grid, cell = 5 }: { grid: string[][]; cell?: number }) {
-  const w = (grid[0]?.length ?? 0) * cell
-  const h = grid.length * cell
-  return (
-    <canvas
-      width={w}
-      height={h}
-      style={{ imageRendering: 'pixelated', background: 'var(--bg)', border: '1px solid var(--line-soft)' }}
-      ref={(el) => {
-        if (!el) return
-        const ctx = el.getContext('2d')!
-        ctx.clearRect(0, 0, w, h)
-        grid.forEach((row, y) =>
-          row.forEach((col, x) => {
-            if (!col) return
-            ctx.fillStyle = col
-            ctx.fillRect(x * cell, y * cell, cell, cell)
-          })
-        )
-      }}
-    />
-  )
-}
+type Tab = 'appearance' | 'layout' | 'scenes' | 'sprites' | 'share'
+const TABS: Tab[] = ['appearance', 'layout', 'scenes', 'sprites', 'share']
 
 export function SettingsPanel({ snap, onClose }: { snap: HudSnapshot; onClose: () => void }) {
-  const [draft, setDraft] = useState<{ name: string; grid: string[][] } | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  const label = { fontFamily: 'var(--font-pixel)', fontSize: 7, letterSpacing: 1 } as const
-  const row = { display: 'flex', alignItems: 'center', gap: 10, fontSize: 11 } as const
-
-  const onFile = (f: File): void => {
-    const img = new Image()
-    img.onload = () => setDraft({ name: f.name.replace(/\.[^.]+$/, '').slice(0, 16) || 'sprite', grid: crunch(img) })
-    img.src = URL.createObjectURL(f)
-  }
-
+  const [tab, setTab] = useState<Tab>('appearance')
   return (
     <div
       onClick={onClose}
@@ -67,183 +17,29 @@ export function SettingsPanel({ snap, onClose }: { snap: HudSnapshot; onClose: (
       <div
         onClick={(e) => e.stopPropagation()}
         className="panel"
-        style={{ width: 460, maxHeight: '84vh', overflowY: 'auto', gap: 12 }}
+        style={{ width: 'min(640px, 92vw)', maxHeight: '86vh', display: 'flex', flexDirection: 'column', gap: 10 }}
       >
-        <header className="panel-title">
+        <header className="panel-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span>Settings</span>
           <span className="corner" style={{ cursor: 'pointer' }} onClick={onClose}>✕ close</span>
         </header>
-
-        <div style={row}>
-          <span style={{ ...label, width: 70 }}>THEME</span>
-          {Array.from(new Set([...Object.keys(BUILTINS), ...Object.keys(snap.userThemes)])).map((name) => (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, borderBottom: '1px dotted var(--line-soft)', paddingBottom: 8 }}>
+          {TABS.map((t) => (
             <button
-              key={name}
-              onClick={() => window.vault.updateConfig({ ui: { theme: name } })}
-              style={{ color: snap.ui.theme === name ? 'var(--clay)' : 'var(--ink)', fontSize: 10 }}
+              key={t}
+              onClick={() => setTab(t)}
+              style={{ fontFamily: 'var(--font-pixel)', fontSize: 8, letterSpacing: 1, padding: '4px 8px', color: tab === t ? 'var(--clay)' : 'var(--ink)' }}
             >
-              {snap.ui.theme === name ? '● ' : '○ '}{name}
+              {t.toUpperCase()}
             </button>
           ))}
         </div>
-
-        <div style={row}>
-          <span style={{ ...label, width: 70 }}>SCENES</span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {ROTATION_DEFAULT.map((name) => {
-              const rotation = snap.ui.scenes?.rotation ?? ROTATION_DEFAULT
-              const on = rotation.includes(name)
-              const toggle = (): void => {
-                const set = new Set(rotation)
-                if (on) set.delete(name)
-                else set.add(name)
-                const next = ROTATION_DEFAULT.filter((n) => set.has(n))
-                if (next.length === 0) return // never leave the Core with nothing to show
-                window.vault.updateConfig({ ui: { scenes: { ...snap.ui.scenes, rotation: next } } })
-              }
-              return (
-                <button key={name} onClick={toggle} style={{ color: on ? 'var(--clay)' : 'var(--ink)', fontSize: 10 }}>
-                  {on ? '● ' : '○ '}{name}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div style={row}>
-          <span style={{ ...label, width: 70 }}>SPEED</span>
-          <button
-            onClick={() =>
-              window.vault.updateConfig({
-                ui: { scenes: { ...snap.ui.scenes, intervalSec: Math.max(3, (snap.ui.scenes?.intervalSec ?? 22) - 4) } }
-              })
-            }
-            style={{ fontSize: 10 }}
-          >
-            −
-          </button>
-          <span className="dim" style={{ fontSize: 10 }}>{snap.ui.scenes?.intervalSec ?? 22}s per scene</span>
-          <button
-            onClick={() =>
-              window.vault.updateConfig({
-                ui: { scenes: { ...snap.ui.scenes, intervalSec: Math.min(600, (snap.ui.scenes?.intervalSec ?? 22) + 4) } }
-              })
-            }
-            style={{ fontSize: 10 }}
-          >
-            +
-          </button>
-        </div>
-
-        <div style={row}>
-          <span style={{ ...label, width: 70 }}>SIZE</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {(() => {
-              const [min, max] = GEOMETRY_BOUNDS.coreMax
-              const v = resolveCoreMax(snap.ui.geometry)
-              const set = (n: number): void =>
-                window.vault.updateConfig({ ui: { geometry: { ...snap.ui.geometry, coreMax: Math.max(min, Math.min(max, n)) } } })
-              return (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <button onClick={() => set(v - 20)} style={{ fontSize: 10 }}>−</button>
-                  <span className="dim" style={{ fontSize: 10, minWidth: 64, textAlign: 'center' }}>core {v}px</span>
-                  <button onClick={() => set(v + 20)} style={{ fontSize: 10 }}>+</button>
-                </span>
-              )
-            })()}
-            <button onClick={() => window.vault.updateConfig({ ui: { geometry: {} } })} style={{ fontSize: 10 }}>
-              reset
-            </button>
-          </div>
-        </div>
-
-        <div style={row}>
-          <span style={{ ...label, width: 70 }}>FRAME</span>
-          <button onClick={() => window.vault.updateConfig({ ui: { parade: !snap.ui.parade } })} style={{ fontSize: 10 }}>
-            {snap.ui.parade ? '● on — critters patrol the frame' : '○ off'}
-          </button>
-        </div>
-
-        <div style={row}>
-          <span style={{ ...label, width: 70 }}>LAYOUT</span>
-          <span className="dim" style={{ fontSize: 10 }}>
-            drag a panel's ⠿ grip to move it between zones, or use + ZONE to add one
-          </span>
-        </div>
-
-        <div style={{ borderTop: '1px dotted var(--line-soft)', paddingTop: 8 }}>
-          <div style={{ ...label, marginBottom: 6 }}>SPRITE STUDIO</div>
-          <div className="dim" style={{ fontSize: 10, marginBottom: 6 }}>
-            drop any image — it becomes a flat 8-bit sprite in its own palette, backdrop stripped. show it big in the totem panel or send it on frame patrol.
-          </div>
-          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
-          <button onClick={() => fileRef.current?.click()} style={{ fontSize: 10 }}>· choose image</button>
-          {draft && (
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginTop: 10 }}>
-              <SpritePreview grid={draft.grid} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <input
-                  value={draft.name}
-                  maxLength={16}
-                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                  style={{ background: 'var(--bg)', color: 'var(--ink)', border: '1px solid var(--line-soft)', fontFamily: 'var(--font-mono)', fontSize: 11, padding: '3px 6px', width: 130 }}
-                />
-                {(['totem', 'frame', 'none'] as const).map((use) => (
-                  <button
-                    key={use}
-                    onClick={() => {
-                      window.vault.saveSprite({ name: draft.name || 'sprite', grid: draft.grid, use })
-                      setDraft(null)
-                    }}
-                    style={{ fontSize: 10 }}
-                  >
-                    save → {use === 'none' ? 'library only' : use === 'totem' ? 'totem panel' : 'frame patrol'}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {snap.sprites.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-              {snap.sprites.map((s: CustomSprite) => (
-                <div key={s.name} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <SpritePreview grid={s.grid} cell={2} />
-                  <span style={{ fontSize: 11, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
-                  {(['totem', 'frame', 'none'] as const).map((use) => (
-                    <span
-                      key={use}
-                      onClick={() => window.vault.saveSprite({ ...s, use })}
-                      style={{ ...label, cursor: 'pointer', color: s.use === use ? 'var(--clay)' : 'var(--ink-dim)' }}
-                    >
-                      {use}
-                    </span>
-                  ))}
-                  <span onClick={() => window.vault.deleteSprite(s.name)} style={{ cursor: 'pointer', color: 'var(--danger)', fontSize: 10 }}>✕</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div style={{ borderTop: '1px dotted var(--line-soft)', paddingTop: 8 }}>
-          <div style={{ ...label, marginBottom: 6 }}>REPOS</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-            {snap.repos.map((r) => (
-              <label key={r.path} style={{ display: 'flex', gap: 6, fontSize: 10, alignItems: 'center', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  defaultChecked
-                  style={{ accentColor: 'var(--ink)' }}
-                  onChange={(e) => {
-                    const keep = snap.repos.filter((x) => x.path !== r.path || e.target.checked).map((x) => ({ name: x.name, path: x.path }))
-                    window.vault.updateConfig({ repos: keep })
-                  }}
-                />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
-              </label>
-            ))}
-          </div>
-          <div className="dim" style={{ fontSize: 9, marginTop: 4 }}>unchecking removes a repo from tracking (saved immediately)</div>
+        <div style={{ overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {tab === 'appearance' && <AppearanceTab snap={snap} />}
+          {tab === 'scenes' && <ScenesTab snap={snap} />}
+          {tab === 'sprites' && <SpritesTab snap={snap} />}
+          {tab === 'layout' && <div className="dim" style={{ fontSize: 11, padding: 8 }}>layout manager — coming in this build</div>}
+          {tab === 'share' && <div className="dim" style={{ fontSize: 11, padding: 8 }}>share — coming in this build</div>}
         </div>
       </div>
     </div>
