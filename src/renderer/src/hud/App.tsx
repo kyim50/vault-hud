@@ -1,5 +1,5 @@
 import { useEffect, useState, type DragEvent, type ReactNode } from 'react'
-import type { HudSnapshot, PanelLayout } from '@shared/types'
+import type { PanelLayout } from '@shared/types'
 import { useSnapshot } from '../lib/useSnapshot'
 import { Panel } from '../components/Panel'
 import { VitalsPanel } from '../components/VitalsPanel'
@@ -15,17 +15,20 @@ import { SkillsPanel } from '../components/SkillsPanel'
 import { TotemPanel } from '../components/TotemPanel'
 import { SettingsPanel } from '../components/SettingsPanel'
 import { lofi } from '../lib/audio'
+import type { HudModule } from '../modules/types'
+import { resolveModule } from '../modules/resolve'
 
-// the two side columns render these panels in user-chosen order (drag the
-// ⠿ grip); the order persists in config as ui.layout
-const PANELS: Record<string, (s: HudSnapshot) => ReactNode> = {
-  vitals: (s) => <VitalsPanel repos={s.repos} usage={s.usage} audio={s.ui.audio} />,
-  directives: (s) => <DirectivesPanel directives={s.directives} />,
-  brain: (s) => <SecondBrainPanel recent={s.brain.recent} resurfaced={s.brain.resurfaced} />,
-  deck: (s) => <CommandDeck commands={s.commands} />,
-  schedule: (s) => <SchedulePanel schedule={s.schedule} />,
-  skills: (s) => <SkillsPanel skills={s.skills} />,
-  totem: (s) => <TotemPanel sprite={s.sprites.find((sp) => sp.use === 'totem')} />
+// the two side columns render these modules in user-chosen order (drag the
+// ⠿ grip); the order persists in config as ui.layout, and each module's
+// enabled/options come from config.ui.modules[id] (see resolveModule)
+const MODULES: Record<string, HudModule<any>> = {
+  vitals: { id: 'vitals', defaults: {}, render: (s) => <VitalsPanel repos={s.repos} usage={s.usage} audio={s.ui.audio} /> },
+  directives: { id: 'directives', defaults: {}, render: (s) => <DirectivesPanel directives={s.directives} /> },
+  brain: { id: 'brain', defaults: {}, render: (s) => <SecondBrainPanel recent={s.brain.recent} resurfaced={s.brain.resurfaced} /> },
+  deck: { id: 'deck', defaults: {}, render: (s) => <CommandDeck commands={s.commands} /> },
+  schedule: { id: 'schedule', defaults: {}, render: (s) => <SchedulePanel schedule={s.schedule} /> },
+  skills: { id: 'skills', defaults: {}, render: (s) => <SkillsPanel skills={s.skills} /> },
+  totem: { id: 'totem', defaults: {}, render: (s) => <TotemPanel sprite={s.sprites.find((sp) => sp.use === 'totem')} /> }
 }
 const DEFAULT_LAYOUT: PanelLayout = {
   left: ['vitals', 'directives', 'brain'],
@@ -40,7 +43,7 @@ function sanitizeLayout(l?: PanelLayout): PanelLayout {
   const seen = new Set<string>()
   const clean = (arr: unknown): string[] =>
     (Array.isArray(arr) ? arr : []).filter(
-      (id): id is string => typeof id === 'string' && id in PANELS && !seen.has(id) && !!seen.add(id)
+      (id): id is string => typeof id === 'string' && id in MODULES && !seen.has(id) && !!seen.add(id)
     )
   const left = clean(l?.left)
   const right = clean(l?.right)
@@ -112,56 +115,62 @@ export default function App() {
         outlineOffset: 2
       }}
     >
-      {layout[col].map((id) => (
-        <div
-          key={id}
-          className="arrange"
-          draggable={armed === id}
-          onDragStart={(e: DragEvent) => {
-            e.dataTransfer.effectAllowed = 'move'
-            setDrag(id)
-          }}
-          onDragEnd={() => {
-            setDrag(null)
-            setArmed(null)
-            setOver(null)
-          }}
-          onDragOver={(e) => {
-            if (drag && drag !== id) {
+      {layout[col].map((id) => {
+        const mod = MODULES[id]
+        if (!mod) return null
+        const { enabled, options } = resolveModule(mod.defaults, snap.ui.modules?.[id])
+        if (!enabled) return null
+        return (
+          <div
+            key={id}
+            className="arrange"
+            draggable={armed === id}
+            onDragStart={(e: DragEvent) => {
+              e.dataTransfer.effectAllowed = 'move'
+              setDrag(id)
+            }}
+            onDragEnd={() => {
+              setDrag(null)
+              setArmed(null)
+              setOver(null)
+            }}
+            onDragOver={(e) => {
+              if (drag && drag !== id) {
+                e.preventDefault()
+                e.stopPropagation()
+                setOver(id)
+              }
+            }}
+            onDrop={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              setOver(id)
-            }
-          }}
-          onDrop={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            if (drag && drag !== id) move(drag, col, id)
-            setOver(null)
-          }}
-          style={{
-            // never squish panels when the window shrinks — the column
-            // scrolls instead (this was crushing Second Brain on resize)
-            flex: GROWS.has(id) ? '1 0 auto' : '0 0 auto',
-            display: 'flex',
-            flexDirection: 'column',
-            opacity: drag === id ? 0.35 : 1,
-            outline: over === id ? '1px dashed var(--clay)' : 'none',
-            outlineOffset: 1,
-            transition: 'opacity 120ms ease'
-          }}
-        >
-          <span
-            className="grip"
-            title="drag to rearrange"
-            onMouseDown={() => setArmed(id)}
-            onMouseUp={() => setArmed(null)}
+              if (drag && drag !== id) move(drag, col, id)
+              setOver(null)
+            }}
+            style={{
+              // never squish panels when the window shrinks — the column
+              // scrolls instead (this was crushing Second Brain on resize)
+              flex: GROWS.has(id) ? '1 0 auto' : '0 0 auto',
+              display: 'flex',
+              flexDirection: 'column',
+              opacity: drag === id ? 0.35 : 1,
+              outline: over === id ? '1px dashed var(--clay)' : 'none',
+              outlineOffset: 1,
+              transition: 'opacity 120ms ease'
+            }}
           >
-            ⠿
-          </span>
-          {PANELS[id](snap)}
-        </div>
-      ))}
+            <span
+              className="grip"
+              title="drag to rearrange"
+              onMouseDown={() => setArmed(id)}
+              onMouseUp={() => setArmed(null)}
+            >
+              ⠿
+            </span>
+            {mod.render(snap, options)}
+          </div>
+        )
+      })}
     </div>
   )
 
