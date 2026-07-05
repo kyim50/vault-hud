@@ -8,6 +8,7 @@ import { computeMood, rollLoot } from './companion'
 import { saveConfig } from './config'
 import { CommandRunner } from './commands/runner'
 import { collectQuotes } from './collectors/quotes'
+import { collectThemes, themesDir } from './collectors/themes'
 
 const BOOT_AT = Date.now()
 
@@ -66,6 +67,7 @@ export class HudState extends EventEmitter {
       if (s.state === 'done') void this.refreshVault()
     })
     this.startWatcher()
+    this.startThemesWatcher()
     await this.refreshAll()
     setInterval(() => void this.refreshAll(), 60_000)
   }
@@ -92,6 +94,25 @@ export class HudState extends EventEmitter {
     }
   }
 
+  // watch the themes folder so a dropped-in / edited theme file hot-loads
+  private startThemesWatcher(): void {
+    let debounce: NodeJS.Timeout | null = null
+    try {
+      const w = watch(themesDir(), () => {
+        if (debounce) clearTimeout(debounce)
+        debounce = setTimeout(async () => {
+          this.snapshot.userThemes = await collectThemes(this.config)
+          this.publish()
+        }, 800)
+      })
+      w.on('error', () => {
+        /* folder not present yet; next refreshAll re-scaffolds + recollects */
+      })
+    } catch {
+      /* fail soft: themes still load on the 60s refreshAll */
+    }
+  }
+
   noteDirectiveDone(): void {
     this.lastDirectiveDone = Date.now()
   }
@@ -111,6 +132,7 @@ export class HudState extends EventEmitter {
     this.snapshot.repos = repos
     this.snapshot.usage = usage
     this.snapshot.quotes = await collectQuotes(this.config)
+    this.snapshot.userThemes = await collectThemes(this.config)
     this.snapshot.primary.value =
       this.config.primaryDirective.source === 'commitsThisWeek'
         ? repos.reduce((s, r) => s + r.commitsWeek, 0)
