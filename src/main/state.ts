@@ -7,6 +7,9 @@ import { collectVaultData } from './collectors/vault'
 import { computeMood, rollLoot } from './companion'
 import { saveConfig } from './config'
 import { CommandRunner } from './commands/runner'
+import { collectQuotes } from './collectors/quotes'
+
+const BOOT_AT = Date.now()
 
 export class HudState extends EventEmitter {
   snapshot: HudSnapshot
@@ -39,7 +42,9 @@ export class HudState extends EventEmitter {
       brain: { recent: [], resurfaced: null },
       generatedAt: 0,
       configCreated,
-      configPath
+      configPath,
+      bootAt: BOOT_AT,
+      quotes: []
     }
     this.runner.on('status', (s) => {
       this.snapshot.commands = this.runner.list()
@@ -104,6 +109,7 @@ export class HudState extends EventEmitter {
     ])
     this.snapshot.repos = repos
     this.snapshot.usage = usage
+    this.snapshot.quotes = await collectQuotes(this.config)
     this.snapshot.primary.value =
       this.config.primaryDirective.source === 'commitsThisWeek'
         ? repos.reduce((s, r) => s + r.commitsWeek, 0)

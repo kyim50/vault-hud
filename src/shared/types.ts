@@ -45,11 +45,17 @@ export interface AudioConfig {
   volume: number // 0-100
 }
 
+export interface ModuleConfig {
+  enabled?: boolean
+  options?: Record<string, unknown>
+}
+
 export interface UiConfig {
   theme: 'terminal' | 'paper'
   parade: boolean // critters patrol the HUD frame
   layout?: PanelLayout
   audio?: AudioConfig
+  modules?: Record<string, ModuleConfig> // per-module rice slice: enable + options
 }
 
 export interface CustomSprite {
@@ -152,4 +158,6 @@ export interface HudSnapshot {
   generatedAt: number
   configCreated: boolean
   configPath: string
+  bootAt: number // main-process start time — uptime source
+  quotes: string[] // defaults merged with a vault Quotes.md when present
 }
