@@ -1,8 +1,7 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import type { HudSnapshot } from '@shared/types'
 import { Panel } from './Panel'
-import { PANDA_MINI, DEFAULT_PALETTE } from '../lib/panda'
-import { spriteToHalfBlocks } from '../lib/blockart'
+import { PANDA_MINI, DEFAULT_PALETTE, pandaColor, type PandaPalette } from '../lib/panda'
 import { fetchLines, type FetchLineId } from '../lib/fetchLines'
 import { getActiveTheme } from '../theme/apply'
 
@@ -24,6 +23,7 @@ export function VaultfetchPanel({ snap, opts }: { snap: HudSnapshot; opts: Fetch
   // 1s tick so uptime stays live; a separate counter rotates the quote
   const [, setTick] = useState(0)
   const [qi, setQi] = useState(() => Math.floor(Math.random() * Math.max(1, snap.quotes.length)))
+  const logoRef = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 1000)
     return () => clearInterval(t)
@@ -42,7 +42,37 @@ export function VaultfetchPanel({ snap, opts }: { snap: HudSnapshot; opts: Fetch
     ? [at.colors.mascotBody, at.colors.mascotDark, at.colors.mascotMuzzle, at.colors.mascotEye, at.colors.ink, at.colors.inkDim]
     : [DEFAULT_PALETTE.body, DEFAULT_PALETTE.dark, DEFAULT_PALETTE.muzzle, DEFAULT_PALETTE.eye, '#e8e6e3', '#9a9a9a']
 
-  const logo = spriteToHalfBlocks(PANDA_MINI, DEFAULT_PALETTE)
+  // mascot logo follows the active theme; drawn as real pixels on a canvas so it
+  // keeps its 14×9 aspect regardless of the mono font's glyph metrics
+  const mascotPal: PandaPalette = at
+    ? { body: at.colors.mascotBody, dark: at.colors.mascotDark, ink: at.colors.ink, eye: at.colors.mascotEye, muzzle: at.colors.mascotMuzzle }
+    : DEFAULT_PALETTE
+  useEffect(() => {
+    const cv = logoRef.current
+    if (!cv || !opts.showLogo) return
+    const w = PANDA_MINI[0].length
+    const h = PANDA_MINI.length
+    const scale = 4
+    const dpr = window.devicePixelRatio || 1
+    cv.width = w * scale * dpr
+    cv.height = h * scale * dpr
+    cv.style.width = `${w * scale}px`
+    cv.style.height = `${h * scale}px`
+    const ctx = cv.getContext('2d')
+    if (!ctx) return
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, w * scale, h * scale)
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const col = pandaColor(PANDA_MINI[y][x] ?? '.', mascotPal, false)
+        if (col) {
+          ctx.fillStyle = col
+          ctx.fillRect(x * scale, y * scale, scale, scale)
+        }
+      }
+    }
+  }, [opts.showLogo, mascotPal.body, mascotPal.dark, mascotPal.ink, mascotPal.eye, mascotPal.muzzle])
+
   const lines = fetchLines(snap, Date.now(), opts.lines)
   const quote = snap.quotes[qi % Math.max(1, snap.quotes.length)] ?? ''
   const header = `${snap.pet.name}@${snap.appName}`
@@ -51,17 +81,7 @@ export function VaultfetchPanel({ snap, opts }: { snap: HudSnapshot; opts: Fetch
     <Panel title="◈ VAULTFETCH">
       <div style={{ display: 'flex', gap: 10, fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1, overflow: 'hidden' }}>
         {opts.showLogo && (
-          <div style={{ lineHeight: '0.62em', letterSpacing: 0, whiteSpace: 'pre', flexShrink: 0 }}>
-            {logo.map((row, y) => (
-              <div key={y} style={{ display: 'flex' }}>
-                {row.map((c, x) => (
-                  <span key={x} style={{ color: c.fg ?? 'transparent', background: c.bg ?? 'transparent' }}>
-                    {c.ch}
-                  </span>
-                ))}
-              </div>
-            ))}
-          </div>
+          <canvas ref={logoRef} style={{ imageRendering: 'pixelated', flexShrink: 0, alignSelf: 'flex-start' }} />
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 8, rowGap: 2, alignContent: 'start', minWidth: 0 }}>
           <div className="clay" style={{ gridColumn: '1 / -1' }}>{header}</div>
