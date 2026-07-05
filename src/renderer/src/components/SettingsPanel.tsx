@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { HudSnapshot } from '@shared/types'
 import { AppearanceTab } from './settings/AppearanceTab'
+import { LayoutTab } from './settings/LayoutTab'
 import { ScenesTab } from './settings/ScenesTab'
 import { SpritesTab } from './settings/SpritesTab'
 
@@ -38,7 +39,7 @@ export function SettingsPanel({ snap, onClose }: { snap: HudSnapshot; onClose: (
           {tab === 'appearance' && <AppearanceTab snap={snap} />}
           {tab === 'scenes' && <ScenesTab snap={snap} />}
           {tab === 'sprites' && <SpritesTab snap={snap} />}
-          {tab === 'layout' && <div className="dim" style={{ fontSize: 11, padding: 8 }}>layout manager — coming in this build</div>}
+          {tab === 'layout' && <LayoutTab snap={snap} />}
           {tab === 'share' && <div className="dim" style={{ fontSize: 11, padding: 8 }}>share — coming in this build</div>}
         </div>
       </div>
