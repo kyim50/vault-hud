@@ -1,6 +1,7 @@
 import type { HudSnapshot } from '@shared/types'
 import { ROTATION_DEFAULT } from '../../lib/resolveScenes'
-import { Section, Row, Stepper, Chips } from './primitives'
+import { SCENE_NAMES } from '../CoreScene'
+import { Section, Row, Stepper, Chips, Picker } from './primitives'
 
 export function ScenesTab({ snap }: { snap: HudSnapshot }) {
   const rotation = snap.ui.scenes?.rotation ?? ROTATION_DEFAULT
@@ -21,6 +22,22 @@ export function ScenesTab({ snap }: { snap: HudSnapshot }) {
       </Row>
       <Row label="SPEED">
         <Stepper value={interval} suffix="s per scene" onDec={() => setInterval(interval - 4)} onInc={() => setInterval(interval + 4)} />
+      </Row>
+      <Row label="BUSY">
+        <Picker
+          value={snap.ui.scenes?.busy ?? 'disco'}
+          options={SCENE_NAMES}
+          onPick={(busy) => window.vault.updateConfig({ ui: { scenes: { ...snap.ui.scenes, busy } } })}
+        />
+        <span className="dim" style={{ fontSize: 10 }}>plays while a command runs</span>
+      </Row>
+      <Row label="NAP">
+        <Picker
+          value={snap.ui.scenes?.nap ?? 'nap'}
+          options={SCENE_NAMES}
+          onPick={(nap) => window.vault.updateConfig({ ui: { scenes: { ...snap.ui.scenes, nap } } })}
+        />
+        <span className="dim" style={{ fontSize: 10 }}>plays after 90min idle</span>
       </Row>
     </Section>
   )

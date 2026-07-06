@@ -636,7 +636,7 @@ const SCENE_REGISTRY: Record<string, SceneDef> = {
   rooftop: { name: 'rooftop', draw: sceneRooftop, horizon: 88 },
   nap: { name: 'nap', draw: sceneNap }
 }
-const SCENE_NAMES = Object.keys(SCENE_REGISTRY)
+export const SCENE_NAMES = Object.keys(SCENE_REGISTRY)
 const TRANS_FRAMES = 30 // ~2.5s: dissolve out → loading beat → dissolve in
 
 // chunky ordered pixel dissolve: replace an `amount` (0..1) fraction of 4px
