@@ -1,31 +1,32 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import '../styles/theme.css'
 import { useSnapshot } from '../lib/useSnapshot'
 import { PANDA_MINI, drawPanda } from '../lib/panda'
+import { BUILTINS } from '../theme/builtins'
+import { resolve } from '../theme/resolve'
+import { applyTheme } from '../theme/apply'
+import type { ResolvedColors } from '../theme/roles'
 import type { Provider } from '@shared/types'
 
 // Boring Notch-style island: collapsed strip that blends with the hardware
 // notch; hover expands to artwork tile + tabbed details about your agent.
-const CREAM = '#f4f2e9'
-const CLAY = '#d97757'
-const DARK_CLAY = '#b85c3f'
-const DIM = '#8d8a7a'
-const EDGE = '#3a382e'
+// Every colour comes from the active theme (resolved below), so the island
+// wears the same look as the HUD instead of a fixed clay-on-black palette.
 
 const TABS = ['STATUS', 'PLAN', 'GIT', 'RUN'] as const
 type Tab = (typeof TABS)[number]
 const PROVIDERS: Provider[] = ['anthropic', 'openai', 'ollama']
 
-// mini artwork: the red panda bobbing/blinking on a dotted floor
-function MiniMascot() {
+// mini artwork: the mascot bobbing/blinking on a dotted floor, themed
+function MiniMascot({ colors }: { colors: ResolvedColors }) {
   const ref = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const ctx = ref.current!.getContext('2d')!
-    const pal = { body: CLAY, dark: DARK_CLAY, ink: CREAM, eye: '#17160f', muzzle: '#e8a284' }
+    const pal = { body: colors.mascotBody, dark: colors.mascotDark, ink: colors.ink, eye: colors.mascotEye, muzzle: colors.mascotMuzzle }
     let f = 0
     const draw = (): void => {
       ctx.clearRect(0, 0, 44, 44)
-      ctx.fillStyle = CREAM
+      ctx.fillStyle = colors.ink
       for (let x = 2; x < 42; x += 3) {
         if ((x * 7) % 5 > 1) ctx.fillRect(x, 40, 1, 1)
       }
@@ -36,13 +37,13 @@ function MiniMascot() {
     draw()
     const t = setInterval(draw, 1000 / 10)
     return () => clearInterval(t)
-  }, [])
+  }, [colors])
   return (
     <canvas
       ref={ref}
       width={44}
       height={44}
-      style={{ width: 88, height: 88, imageRendering: 'pixelated', background: '#151510', border: `1px solid ${EDGE}`, borderRadius: 8 }}
+      style={{ width: 88, height: 88, imageRendering: 'pixelated', background: colors.surface, border: `1px solid ${colors.line}`, borderRadius: 8 }}
     />
   )
 }
@@ -54,6 +55,22 @@ export default function NotchApp() {
   const snap = useSnapshot()
   const [expanded, setExpanded] = useState(false)
   const [tab, setTab] = useState<Tab>('STATUS')
+
+  // resolve + apply the active theme just like the HUD does, so the island's
+  // fonts and colours track whatever rice is active (fail-soft to terminal)
+  const resolved = useMemo(() => {
+    try {
+      const defs = { ...BUILTINS, ...(snap?.userThemes ?? {}) }
+      return resolve(defs[snap?.ui.theme ?? 'terminal'] ?? BUILTINS.terminal)
+    } catch {
+      return resolve(BUILTINS.terminal)
+    }
+  }, [snap?.ui.theme, snap?.userThemes])
+  useLayoutEffect(() => {
+    applyTheme(resolved)
+  }, [resolved])
+  const c = resolved.colors
+
   useEffect(() => {
     window.vault.resizeNotch(expanded)
   }, [expanded])
@@ -80,12 +97,12 @@ export default function NotchApp() {
       onMouseLeave={() => setExpanded(false)}
       style={{
         height: '100vh',
-        background: '#000',
+        background: c.bg,
         borderRadius: '0 0 18px 18px',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        color: CREAM,
+        color: c.ink,
         opacity: expanded ? 1 : 0,
         transform: expanded ? 'scaleY(1)' : 'scaleY(0.24)',
         transformOrigin: 'top center',
@@ -98,24 +115,24 @@ export default function NotchApp() {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 18px', height: NOTCH_H, flexShrink: 0 }}>
         {/* these hug the wings either side of the physical notch */}
-        <span style={{ ...label, fontSize: 8, color: running ? CLAY : CREAM }}>
+        <span style={{ ...label, fontSize: 8, color: running ? c.mascotBody : c.ink }}>
           {running ? `▶ ${running.info.label}` : 'vault'}
         </span>
-        <span style={{ ...label, fontSize: 8, color: snap && snap.usage.percent > 80 ? CLAY : DIM }}>
+        <span style={{ ...label, fontSize: 8, color: snap && snap.usage.percent > 80 ? c.mascotBody : c.inkDim }}>
           ◉ {snap?.usage.percent ?? 0}%
         </span>
       </div>
 
       {expanded && snap && (
         <div style={{ display: 'flex', gap: 12, padding: '6px 14px 12px', flex: 1, minHeight: 0 }}>
-          <MiniMascot />
+          <MiniMascot colors={c} />
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'flex', gap: 10 }}>
               {TABS.map((t) => (
                 <span
                   key={t}
                   onClick={() => setTab(t)}
-                  style={{ ...label, cursor: 'pointer', color: t === tab ? CLAY : DIM, paddingBottom: 2, borderBottom: t === tab ? `1px solid ${CLAY}` : '1px solid transparent' }}
+                  style={{ ...label, cursor: 'pointer', color: t === tab ? c.mascotBody : c.inkDim, paddingBottom: 2, borderBottom: t === tab ? `1px solid ${c.mascotBody}` : '1px solid transparent' }}
                 >
                   {t}
                 </span>
@@ -125,19 +142,19 @@ export default function NotchApp() {
             {tab === 'STATUS' && (
               <div style={{ ...mono, display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: DIM }}>{snap.usage.mode === 'cpu' ? 'LOCAL CPU LOAD' : 'TOKEN WINDOW'}</span>
-                  <span style={{ color: snap.usage.percent > 80 ? CLAY : CREAM }}>
+                  <span style={{ color: c.inkDim }}>{snap.usage.mode === 'cpu' ? 'LOCAL CPU LOAD' : 'TOKEN WINDOW'}</span>
+                  <span style={{ color: snap.usage.percent > 80 ? c.mascotBody : c.ink }}>
                     {snap.usage.mode === 'cpu'
                       ? `${snap.usage.percent}% · ${snap.usage.cores ?? 0} cores`
                       : `${snap.usage.percent}% · ${Math.round(snap.usage.windowTokens / 1000)}K`}
                   </span>
                 </div>
-                <div style={{ height: 4, background: '#26251e', borderRadius: 2 }}>
-                  <div style={{ height: '100%', width: `${snap.usage.percent}%`, background: snap.usage.percent > 80 ? CLAY : CREAM, borderRadius: 2, transition: 'width 600ms cubic-bezier(0.22,1,0.36,1)' }} />
+                <div style={{ height: 4, background: c.lineSoft, borderRadius: 2 }}>
+                  <div style={{ height: '100%', width: `${snap.usage.percent}%`, background: snap.usage.percent > 80 ? c.mascotBody : c.ink, borderRadius: 2, transition: 'width 600ms cubic-bezier(0.22,1,0.36,1)' }} />
                 </div>
-                <div style={{ color: DIM }}>
+                <div style={{ color: c.inkDim }}>
                   {running
-                    ? <span><span style={{ color: CLAY }}>▶ running</span> {running.info.label.toLowerCase()}</span>
+                    ? <span><span style={{ color: c.mascotBody }}>▶ running</span> {running.info.label.toLowerCase()}</span>
                     : `idle · ${snap.commands.filter((c) => c.status.state === 'done').length} done today`}
                 </div>
               </div>
@@ -146,17 +163,17 @@ export default function NotchApp() {
             {tab === 'PLAN' && (
               <div style={{ ...mono, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: DIM }}>{snap.primary.label}</span>
+                  <span style={{ color: c.inkDim }}>{snap.primary.label}</span>
                   <span>{snap.primary.value.toLocaleString()} / {snap.primary.target.toLocaleString()}</span>
                 </div>
                 {snap.directives.filter((d) => !d.done).slice(0, 2).map((d) => (
                   <div key={`${d.file}:${d.line}`} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    <span style={{ color: CLAY }}>□ </span>{d.text}
+                    <span style={{ color: c.mascotBody }}>□ </span>{d.text}
                   </div>
                 ))}
-                {snap.directives.length === 0 && <span style={{ color: DIM }}>no plan yet — run PLAN TODAY</span>}
+                {snap.directives.length === 0 && <span style={{ color: c.inkDim }}>no plan yet — run PLAN TODAY</span>}
                 {snap.directives.length > 0 && (
-                  <span style={{ color: DIM }}>{snap.directives.filter((d) => d.done).length}/{snap.directives.length} done</span>
+                  <span style={{ color: c.inkDim }}>{snap.directives.filter((d) => d.done).length}/{snap.directives.length} done</span>
                 )}
               </div>
             )}
@@ -166,8 +183,8 @@ export default function NotchApp() {
                 {[...snap.repos].sort((a, b) => b.commitsWeek - a.commitsWeek).slice(0, 3).map((r) => (
                   <div key={r.path} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</span>
-                    <span style={{ color: DIM, flexShrink: 0 }}>
-                      {r.commitsWeek}/wk{r.dirtyFiles > 0 ? <span style={{ color: CLAY }}> · {r.dirtyFiles}✎</span> : ''}
+                    <span style={{ color: c.inkDim, flexShrink: 0 }}>
+                      {r.commitsWeek}/wk{r.dirtyFiles > 0 ? <span style={{ color: c.mascotBody }}> · {r.dirtyFiles}✎</span> : ''}
                     </span>
                   </div>
                 ))}
@@ -181,7 +198,7 @@ export default function NotchApp() {
                     key={info.id}
                     onClick={() => window.vault.runCommand(info.id)}
                     disabled={status.state === 'running' || status.state === 'queued'}
-                    style={{ fontSize: 8, padding: '5px 6px', boxShadow: 'none', background: '#000', color: status.state === 'running' ? CLAY : CREAM, border: `1px solid ${EDGE}`, borderRadius: 4 }}
+                    style={{ fontSize: 8, padding: '5px 6px', boxShadow: 'none', background: c.surface, color: status.state === 'running' ? c.mascotBody : c.ink, border: `1px solid ${c.line}`, borderRadius: 4 }}
                   >
                     {status.state === 'running' ? '▶ ' : status.state === 'failed' ? '✕ ' : '· '}
                     {info.label}
@@ -215,8 +232,8 @@ export default function NotchApp() {
                   ...label,
                   cursor: 'pointer',
                   padding: '3px 6px',
-                  color: active ? CLAY : DIM,
-                  border: `1px solid ${active ? CLAY : EDGE}`,
+                  color: active ? c.mascotBody : c.inkDim,
+                  border: `1px solid ${active ? c.mascotBody : c.line}`,
                   borderRadius: 3
                 }}
               >
