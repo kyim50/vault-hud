@@ -68,7 +68,7 @@ export function SpritesTab({ snap }: { snap: HudSnapshot }) {
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 style={{ background: 'var(--bg)', color: 'var(--ink)', border: '1px solid var(--line-soft)', fontFamily: 'var(--font-mono)', fontSize: 11, padding: '3px 6px', width: 130 }}
               />
-              {(['totem', 'frame', 'none'] as const).map((use) => (
+              {(['totem', 'frame', 'mascot', 'none'] as const).map((use) => (
                 <button
                   key={use}
                   onClick={() => {
@@ -77,7 +77,7 @@ export function SpritesTab({ snap }: { snap: HudSnapshot }) {
                   }}
                   style={{ fontSize: 10 }}
                 >
-                  save → {use === 'none' ? 'library only' : use === 'totem' ? 'totem panel' : 'frame patrol'}
+                  save → {use === 'none' ? 'library only' : use === 'totem' ? 'totem panel' : use === 'mascot' ? 'the mascot' : 'frame patrol'}
                 </button>
               ))}
             </div>
@@ -89,7 +89,7 @@ export function SpritesTab({ snap }: { snap: HudSnapshot }) {
               <div key={s.name} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                 <SpritePreview grid={s.grid} cell={2} />
                 <span style={{ fontSize: 11, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
-                {(['totem', 'frame', 'none'] as const).map((use) => (
+                {(['totem', 'frame', 'mascot', 'none'] as const).map((use) => (
                   <span
                     key={use}
                     onClick={() => window.vault.saveSprite({ ...s, use })}

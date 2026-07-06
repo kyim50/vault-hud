@@ -59,6 +59,21 @@ export interface SceneConfig {
   nap?: string // scene shown after 90min idle
 }
 
+export interface SceneProp {
+  sprite: string // a CustomSprite name from the library
+  x: number // 0–100, % of scene width (sprite center)
+  y: number // 0–100, % of scene height (sprite center)
+  scale: number // 1–4 pixel scale
+  drift?: boolean // slow horizontal sway + bob
+}
+
+export interface CustomScene {
+  name: string // unique; may not collide with a built-in scene name
+  sky: [string, string] // [top, bottom] gradient hex
+  ground: string // ground band hex
+  props: SceneProp[]
+}
+
 export interface GeometryConfig {
   zoneWidths?: number[] // px per zone, index-aligned with layout.zones
   flexZone?: number // index of the zone that soaks leftover width (the `1fr`)
@@ -109,6 +124,7 @@ export interface UiConfig {
   modules?: Record<string, ModuleConfig> // per-module rice slice: enable + options
   themes?: Record<string, ThemeDef> // inline user themes (folder themes merge over these)
   scenes?: SceneConfig
+  customScenes?: CustomScene[]
   geometry?: GeometryConfig
   notch?: NotchConfig
 }
@@ -125,8 +141,9 @@ export interface CustomSprite {
   name: string
   grid: string[][] // rows of hex colors; '' = transparent
   // frame: patrols the HUD border · totem: displayed big in the Totem panel
+  // mascot: used in CustomScene props · none: sprite in library but unused
   // (legacy 'parade' → 'frame' and 'pet' → 'totem' migrate on load)
-  use: 'frame' | 'totem' | 'none'
+  use: 'frame' | 'totem' | 'mascot' | 'none'
 }
 
 export interface RepoStats {

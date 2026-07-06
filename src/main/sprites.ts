@@ -13,7 +13,7 @@ function sane(s: CustomSprite): boolean {
     typeof s.name === 'string' && s.name.length > 0 && s.name.length <= 24 &&
     Array.isArray(s.grid) && s.grid.length > 0 && s.grid.length <= MAX_DIM &&
     s.grid.every((row) => Array.isArray(row) && row.length <= MAX_DIM && row.every((c) => typeof c === 'string' && c.length <= 9)) &&
-    ['frame', 'totem', 'none'].includes(s.use)
+    ['frame', 'totem', 'mascot', 'none'].includes(s.use)
   )
 }
 
@@ -42,6 +42,9 @@ export async function saveSprite(list: CustomSprite[], sprite: CustomSprite): Pr
   // the totem slot is exclusive — one displayed sprite at a time
   if (sprite.use === 'totem') {
     for (const s of next) if (s.name !== sprite.name && s.use === 'totem') s.use = 'none'
+  }
+  if (sprite.use === 'mascot') {
+    for (const s of next) if (s.name !== sprite.name && s.use === 'mascot') s.use = 'none'
   }
   try {
     await fs.mkdir(CONFIG_DIR, { recursive: true })

@@ -47,11 +47,14 @@ export function VaultfetchPanel({ snap, opts }: { snap: HudSnapshot; opts: Fetch
   const mascotPal: PandaPalette = at
     ? { body: at.colors.mascotBody, dark: at.colors.mascotDark, ink: at.colors.ink, eye: at.colors.mascotEye, muzzle: at.colors.mascotMuzzle }
     : DEFAULT_PALETTE
+  const mascotSprite = snap.sprites.find((s) => s.use === 'mascot')
   useEffect(() => {
     const cv = logoRef.current
     if (!cv || !opts.showLogo) return
-    const w = PANDA_MINI[0].length
-    const h = PANDA_MINI.length
+    const grid = mascotSprite?.grid
+    const w = grid ? (grid[0]?.length ?? 0) : PANDA_MINI[0].length
+    const h = grid ? grid.length : PANDA_MINI.length
+    if (w === 0 || h === 0) return
     const scale = 4
     const dpr = window.devicePixelRatio || 1
     cv.width = w * scale * dpr
@@ -64,14 +67,14 @@ export function VaultfetchPanel({ snap, opts }: { snap: HudSnapshot; opts: Fetch
     ctx.clearRect(0, 0, w * scale, h * scale)
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const col = pandaColor(PANDA_MINI[y][x] ?? '.', mascotPal, false)
+        const col = grid ? grid[y][x] : pandaColor(PANDA_MINI[y][x] ?? '.', mascotPal, false)
         if (col) {
           ctx.fillStyle = col
           ctx.fillRect(x * scale, y * scale, scale, scale)
         }
       }
     }
-  }, [opts.showLogo, mascotPal.body, mascotPal.dark, mascotPal.ink, mascotPal.eye, mascotPal.muzzle])
+  }, [opts.showLogo, mascotSprite, mascotPal.body, mascotPal.dark, mascotPal.ink, mascotPal.eye, mascotPal.muzzle])
 
   const lines = fetchLines(snap, Date.now(), opts.lines)
   const quote = snap.quotes[qi % Math.max(1, snap.quotes.length)] ?? ''

@@ -1,11 +1,13 @@
-import { useEffect, useRef } from 'react'
-import type { LinkGraph, Mood, SceneConfig } from '@shared/types'
+import { useEffect, useMemo, useRef } from 'react'
+import type { CustomScene, CustomSprite, LinkGraph, Mood, SceneConfig } from '@shared/types'
 import { PANDA, PANDA_BODY_ROWS, PANDA_BUDDY, drawPanda } from '../lib/panda'
 import { sceneColors, scenePalette } from '../theme/sceneColors'
 import { layoutConstellation, hitStar, type Star } from '../lib/constellation'
 import { drawPixelText, measurePixelText } from '../lib/pixelfont'
 import { loadingPhase } from '../lib/loadingTransition'
 import { resolveScenes, ROTATION_DEFAULT } from '../lib/resolveScenes'
+import { resolveCustomScenes } from '../lib/resolveCustomScene'
+import { drawCustomScene } from '../lib/drawCustomScene'
 
 // Halftone scene engine: the red panda living out rotating pixel scenes.
 // Dual-state canvas: hovering a Second Brain note dissolves the scene into
@@ -912,6 +914,8 @@ export function CoreScene({
   graph,
   chart,
   scenes,
+  customScenes,
+  sprites,
   maxWidth = 560
 }: {
   usagePercent: number
@@ -921,6 +925,8 @@ export function CoreScene({
   graph: LinkGraph
   chart: boolean
   scenes?: SceneConfig
+  customScenes?: CustomScene[]
+  sprites: CustomSprite[]
   maxWidth?: number
 }) {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -936,7 +942,40 @@ export function CoreScene({
   graphRef.current = graph
   const chartRef = useRef(chart)
   chartRef.current = chart
-  const scn = resolveScenes(scenes, SCENE_NAMES, ROTATION_DEFAULT, FPS)
+  // user-authored scenes merge into the name-keyed registry so they rotate /
+  // busy / nap exactly like the built-ins (fail-soft; parity when none)
+  const spritesByName = useMemo(() => new Map((sprites ?? []).map((s) => [s.name, s.grid])), [sprites])
+  const customList = useMemo(
+    () => resolveCustomScenes(customScenes, new Set(spritesByName.keys()), new Set(SCENE_NAMES)),
+    [customScenes, spritesByName]
+  )
+  const registry = useMemo(
+    () => ({
+      ...SCENE_REGISTRY,
+      ...Object.fromEntries(
+        customList.map((s) => [
+          s.name,
+          {
+            name: s.name,
+            horizon: Math.round(H * 0.78),
+            // guard the custom draw so a malformed scene can never throw out of
+            // the render loop and freeze the whole Core (defense-in-depth)
+            draw: (c: Ctx, f: number): void => {
+              try {
+                drawCustomScene(c, s, spritesByName, f, W, H)
+              } catch {
+                /* a bad custom scene is skipped, not fatal */
+              }
+            }
+          }
+        ])
+      )
+    }),
+    [customList, spritesByName]
+  )
+  const registryRef = useRef(registry)
+  registryRef.current = registry
+  const scn = resolveScenes(scenes, Object.keys(registry), ROTATION_DEFAULT, FPS)
   const scnRef = useRef(scn)
   scnRef.current = scn
 
@@ -1015,12 +1054,12 @@ export function CoreScene({
       const sceneFrames = scnRef.current.intervalFrames
       const rot = scnRef.current.rotation
       const slot = Math.floor(frame / sceneFrames)
-      const entry = busyRef.current ? SCENE_REGISTRY[scnRef.current.busy] : SCENE_REGISTRY[rot[slot % rot.length]]
+      const entry = busyRef.current ? registryRef.current[scnRef.current.busy] : registryRef.current[rot[slot % rot.length]]
       const napping = !busyRef.current && moodRef.current === 'napping'
       const inScene = tf - slot * sceneFrames
       if (dissolve < 1) {
         if (!napping && inScene < TRANS_FRAMES && slot > 0 && !busyRef.current) {
-          const prevEntry = SCENE_REGISTRY[rot[(slot - 1) % rot.length]]
+          const prevEntry = registryRef.current[rot[(slot - 1) % rot.length]]
           const blinkEvery = usageRef.current > 80 ? 24 : 48
           const frozenF = slot * sceneFrames - 1 // last frame of the outgoing scene
           drawLoadingTransition(
@@ -1043,7 +1082,7 @@ export function CoreScene({
           const blinkEvery = usageRef.current > 80 ? 24 : 48
           sctx.clearRect(0, 0, W, H)
           if (napping) {
-            SCENE_REGISTRY[scnRef.current.nap].draw(sctx, frame, false)
+            registryRef.current[scnRef.current.nap].draw(sctx, frame, false)
           } else {
             entry.draw(sctx, frame, frame % blinkEvery >= blinkEvery - 6)
             if (entry.horizon !== undefined) drawLoot(sctx, lootRef.current, entry.horizon, frame)
