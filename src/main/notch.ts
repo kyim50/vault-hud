@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain, screen } from 'electron'
 import { join } from 'node:path'
 import { IPC } from '@shared/ipc'
+import type { ResolvedNotch } from '@shared/resolveNotch'
 
 // The island must read as part of the hardware notch. The window is created
 // at full (expanded) size once and never resized — expansion is a pure CSS
@@ -18,11 +19,11 @@ export function menuBarHeight(): number {
 
 export const NOTCH_WIDTH = 440
 
-export function createNotchWindow(): BrowserWindow {
+export function createNotchWindow(cfg: ResolvedNotch): BrowserWindow {
   const display = screen.getPrimaryDisplay()
   const m = menuBarHeight()
   // +18 hosts the multi-provider toggle bar at the island's foot
-  const size = { width: NOTCH_WIDTH, height: m + 140 }
+  const size = { width: cfg.width, height: m + cfg.expandedHeight }
   const win = new BrowserWindow({
     ...size,
     x: Math.round(display.bounds.x + display.bounds.width / 2 - size.width / 2),
@@ -73,4 +74,13 @@ export function createNotchWindow(): BrowserWindow {
     else win.setIgnoreMouseEvents(true, { forward: true })
   })
   return win
+}
+
+// re-pin the notch centered at the top with a new size — a plain resize (NOT
+// the expand/collapse animation, which stays pure CSS), used for live config edits
+export function applyNotchBounds(win: BrowserWindow, cfg: ResolvedNotch): void {
+  const d = screen.getPrimaryDisplay()
+  const width = cfg.width
+  const height = menuBarHeight() + cfg.expandedHeight
+  win.setBounds({ x: Math.round(d.bounds.x + d.bounds.width / 2 - width / 2), y: d.bounds.y, width, height })
 }
