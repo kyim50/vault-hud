@@ -12,6 +12,13 @@ export const sceneColors = {
 }
 export const scenePalette = { body: '#d97757', dark: '#b85c3f', ink: '#e8e6e3', eye: '#17160f', muzzle: '#f4f2e9' }
 
+// the main character: a user 'mascot' sprite (its own colors) that replaces the
+// panda everywhere in the scenes, or null → the built-in panda. Read each frame.
+export const mascotArt: { grid: string[][] | null } = { grid: null }
+export function setMascotArt(grid: string[][] | null): void {
+  mascotArt.grid = grid
+}
+
 export function setSceneColors(t: ResolvedTheme): void {
   const c = t.colors
   sceneColors.ink = c.ink

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import type { CustomScene, CustomSprite, LinkGraph, Mood, SceneConfig } from '@shared/types'
 import { PANDA, PANDA_BODY_ROWS, PANDA_BUDDY, drawPanda } from '../lib/panda'
-import { sceneColors, scenePalette } from '../theme/sceneColors'
+import { sceneColors, scenePalette, mascotArt, setMascotArt } from '../theme/sceneColors'
 import { layoutConstellation, hitStar, type Star } from '../lib/constellation'
 import { drawPixelText, measurePixelText } from '../lib/pixelfont'
 import { loadingPhase } from '../lib/loadingTransition'
@@ -34,17 +34,41 @@ type Ctx = CanvasRenderingContext2D
 type SceneFn = (ctx: Ctx, f: number, blink: boolean) => void
 interface SceneDef { name: string; draw: SceneFn; horizon?: number }
 
+// paint a custom mascot sprite (its own colors) so its feet sit on `feetY`,
+// centered on `centerX`, scaled to roughly `targetH` px tall. Used everywhere
+// the panda would be drawn when the user has set a 'mascot' sprite.
+function paintMascotSprite(ctx: Ctx, grid: string[][], centerX: number, feetY: number, targetH: number, bob: number): void {
+  const gw = grid[0]?.length ?? 0
+  const gh = grid.length
+  if (gw === 0 || gh === 0) return
+  const scale = Math.max(1, Math.round(targetH / gh))
+  const ox = Math.round(centerX - (gw * scale) / 2)
+  const oy = Math.round(feetY - gh * scale + bob)
+  for (let y = 0; y < gh; y++) {
+    for (let x = 0; x < gw; x++) {
+      const c = grid[y][x]
+      if (c) {
+        ctx.fillStyle = c
+        ctx.fillRect(ox + x * scale, oy + y * scale, scale, scale)
+      }
+    }
+  }
+}
+
 function drawWalker(ctx: Ctx, f: number, blink: boolean, x: number, groundY: number, moving: boolean): void {
   const bob = moving ? (Math.floor(f / 3) % 2) : (Math.floor(f / 8) % 2)
+  if (mascotArt.grid) return paintMascotSprite(ctx, mascotArt.grid, Math.round(x) + PANDA[0].length, groundY, 30, bob)
   drawPanda(ctx, PANDA, Math.round(x), groundY - PANDA.length * 2 + bob, 2, scenePalette, { blink, step: bob as 0 | 1 })
 }
 
 function drawSitter(ctx: Ctx, blink: boolean, x: number, y: number): void {
+  if (mascotArt.grid) return paintMascotSprite(ctx, mascotArt.grid, Math.round(x) + PANDA[0].length, y + PANDA_BODY_ROWS * 2, 26, 0)
   drawPanda(ctx, PANDA.slice(0, PANDA_BODY_ROWS), Math.round(x), y, 2, scenePalette, { blink })
 }
 
 function drawBuddy(ctx: Ctx, f: number, blink: boolean, x: number, groundY: number, hopBeat = 4): void {
   const hop = Math.floor(f / hopBeat) % 3 === 0 ? -2 : 0
+  if (mascotArt.grid) return paintMascotSprite(ctx, mascotArt.grid, Math.round(x) + PANDA_BUDDY[0].length, groundY, 16, hop)
   drawPanda(ctx, PANDA_BUDDY, Math.round(x), groundY - PANDA_BUDDY.length * 2 + hop, 2, scenePalette, { blink })
 }
 
@@ -308,14 +332,18 @@ function sceneDisco(ctx: Ctx, f: number, blink: boolean): void {
   const bob = Math.floor(f / 3) % 2
   const sx = Math.round(W / 2 - 22)
   const sy = floor - PANDA.length * 2 - 8 + bob
-  drawPanda(ctx, PANDA, sx, sy, 2, scenePalette, { blink, step: bob as 0 | 1 })
-  // headphones: a band across the crown + over-ear cups hugging each side
-  // (positioned for the blob mascot — clear of the eyes at cols 5-6 / 16-17)
-  ctx.fillStyle = sceneColors.ink
-  for (let c = 4; c <= 19; c++) ctx.fillRect(sx + c * 2, sy + 2, 2, 2)
-  for (let r = 2; r <= 7; r++) {
-    ctx.fillRect(sx + 2 * 2, sy + r * 2, 2, 2)
-    ctx.fillRect(sx + 21 * 2, sy + r * 2, 2, 2)
+  if (mascotArt.grid) {
+    paintMascotSprite(ctx, mascotArt.grid, sx + PANDA[0].length, sy + PANDA.length * 2, 30, 0)
+  } else {
+    drawPanda(ctx, PANDA, sx, sy, 2, scenePalette, { blink, step: bob as 0 | 1 })
+    // headphones: a band across the crown + over-ear cups hugging each side
+    // (positioned for the blob mascot — clear of the eyes at cols 5-6 / 16-17)
+    ctx.fillStyle = sceneColors.ink
+    for (let c = 4; c <= 19; c++) ctx.fillRect(sx + c * 2, sy + 2, 2, 2)
+    for (let r = 2; r <= 7; r++) {
+      ctx.fillRect(sx + 2 * 2, sy + r * 2, 2, 2)
+      ctx.fillRect(sx + 21 * 2, sy + r * 2, 2, 2)
+    }
   }
   for (let x = 58; x < 134; x += 2) ctx.fillRect(x, floor - 8, 1, 1)
   ctx.fillStyle = sceneColors.eye
@@ -665,7 +693,11 @@ function drawLoading(ctx: Ctx, f: number): void {
   const ch = PANDA.length * 2
   const sx = Math.round(W / 2 - cw / 2)
   const sy = Math.round(H / 2 - ch / 2) - 4 + bob
-  drawPanda(ctx, PANDA, sx, sy, 2, scenePalette, { blink: false, step: bob as 0 | 1 })
+  if (mascotArt.grid) {
+    paintMascotSprite(ctx, mascotArt.grid, sx + cw / 2, sy + ch, 30, 0)
+  } else {
+    drawPanda(ctx, PANDA, sx, sy, 2, scenePalette, { blink: false, step: bob as 0 | 1 })
+  }
   const n = 1 + (Math.floor(f / 4) % 3) // · ·· ···
   const gap = 6
   let dx = Math.round(W / 2 - ((n - 1) * gap) / 2)
@@ -975,6 +1007,11 @@ export function CoreScene({
   )
   const registryRef = useRef(registry)
   registryRef.current = registry
+  // the 'mascot' sprite becomes the main character in every built-in scene
+  // (null → the panda). Read as a live singleton by the scene draw helpers.
+  useEffect(() => {
+    setMascotArt(sprites?.find((s) => s.use === 'mascot')?.grid ?? null)
+  }, [sprites])
   const scn = resolveScenes(scenes, Object.keys(registry), ROTATION_DEFAULT, FPS)
   const scnRef = useRef(scn)
   scnRef.current = scn
