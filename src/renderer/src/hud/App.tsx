@@ -75,6 +75,8 @@ const MODULES: Record<string, HudModule<any>> = {
           graph={s.graph}
           chart={ctx.chart}
           scenes={s.ui.scenes}
+          customScenes={s.ui.customScenes}
+          sprites={s.sprites}
           maxWidth={ctx.coreMax}
         />
         <div style={{ borderTop: '1px dotted var(--line-soft)', paddingTop: 8 }}>
