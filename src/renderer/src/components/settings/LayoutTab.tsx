@@ -3,7 +3,7 @@ import { resolveLayout, DEFAULT_ZONES } from '../../lib/resolveLayout'
 import { resolveGeometry, GEOMETRY_BOUNDS } from '../../lib/resolveGeometry'
 import { resolveModule } from '../../modules/resolve'
 import { resolvePanelSize, DEFAULT_GROW } from '../../lib/resolvePanelSize'
-import { resolveNotch } from '@shared/resolveNotch'
+import { resolveNotch, NOTCH_BOUNDS } from '@shared/resolveNotch'
 import { Section, Row, Stepper, Toggle, Picker } from './primitives'
 
 // every module appears in the canonical default layout — use it as the id list
@@ -52,8 +52,12 @@ export function LayoutTab({ snap }: { snap: HudSnapshot }) {
   const setHeight = (id: string, h: number | null): void =>
     window.vault.updateConfig({ ui: { modules: { ...snap.ui.modules, [id]: { ...snap.ui.modules?.[id], grow: false, height: h == null ? undefined : Math.max(80, Math.min(900, h)) } } } })
   const notch = resolveNotch(snap.ui.notch)
-  const setNotch = (patch: Partial<{ enabled: boolean; width: number; expandedHeight: number }>): void =>
-    window.vault.updateConfig({ ui: { notch: { ...snap.ui.notch, ...patch } } })
+  const setNotch = (patch: Partial<{ enabled: boolean; width: number; expandedHeight: number }>): void => {
+    const clamped = { ...patch }
+    if (typeof clamped.width === 'number') clamped.width = Math.max(NOTCH_BOUNDS.width[0], Math.min(NOTCH_BOUNDS.width[1], clamped.width))
+    if (typeof clamped.expandedHeight === 'number') clamped.expandedHeight = Math.max(NOTCH_BOUNDS.expandedHeight[0], Math.min(NOTCH_BOUNDS.expandedHeight[1], clamped.expandedHeight))
+    window.vault.updateConfig({ ui: { notch: { ...snap.ui.notch, ...clamped } } })
+  }
 
   const zoneNames = zones.map((_, i) => String(i))
   return (

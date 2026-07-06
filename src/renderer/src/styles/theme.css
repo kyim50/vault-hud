@@ -142,3 +142,11 @@ body.notch { background: transparent; color: #f4f2e9; }
 .resize-handle:hover {
   background: linear-gradient(to right, transparent 3px, var(--clay) 3px, var(--clay) 4px, transparent 4px);
 }
+
+.panel-vresize {
+  background: transparent;
+  transition: background 120ms;
+}
+.panel-vresize:hover {
+  background: linear-gradient(to bottom, transparent 3px, var(--clay) 3px, var(--clay) 4px, transparent 4px);
+}

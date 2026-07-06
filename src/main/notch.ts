@@ -22,7 +22,7 @@ export const NOTCH_WIDTH = 440
 export function createNotchWindow(cfg: ResolvedNotch): BrowserWindow {
   const display = screen.getPrimaryDisplay()
   const m = menuBarHeight()
-  // +18 hosts the multi-provider toggle bar at the island's foot
+  // window height = menu-bar height + the configured expanded island height
   const size = { width: cfg.width, height: m + cfg.expandedHeight }
   const win = new BrowserWindow({
     ...size,
