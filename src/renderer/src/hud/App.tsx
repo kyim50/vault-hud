@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { resolveGeometry, GEOMETRY_BOUNDS, type ResolvedGeometry } from '../lib/resolveGeometry'
 import { resolveLayout } from '../lib/resolveLayout'
+import { resolvePanelSize, DEFAULT_GROW } from '../lib/resolvePanelSize'
 import { useSnapshot } from '../lib/useSnapshot'
 import { Panel } from '../components/Panel'
 import { VitalsPanel } from '../components/VitalsPanel'
@@ -84,8 +85,6 @@ const MODULES: Record<string, HudModule<any>> = {
   }
 }
 const VALID_IDS = new Set(Object.keys(MODULES))
-// these soak up leftover column height; the rest hug their content
-const GROWS = new Set(['brain', 'skills', 'core'])
 
 export default function App() {
   const snap = useSnapshot()
@@ -107,6 +106,9 @@ export default function App() {
   const [localGeometry, setLocalGeometry] = useState<ResolvedGeometry | null>(null)
   const draggingRef = useRef(false)
   const dragValueRef = useRef<ResolvedGeometry | null>(null)
+  const [localPanelHeights, setLocalPanelHeights] = useState<Record<string, number>>({})
+  const panelDragRef = useRef(false)
+  const panelHeightRef = useRef<number | null>(null)
   useLayoutEffect(() => {
     if (!snap) return
     try {
@@ -130,6 +132,9 @@ export default function App() {
   useEffect(() => {
     if (!draggingRef.current) setLocalGeometry(null)
   }, [JSON.stringify(snap?.ui.geometry)])
+  useEffect(() => {
+    if (!panelDragRef.current) setLocalPanelHeights({})
+  }, [JSON.stringify(snap?.ui.modules)])
   if (!snap) return <p style={{ padding: 16 }}>booting…</p>
 
   const zones = localLayout ?? resolveLayout(snap.ui.layout, VALID_IDS)
@@ -161,6 +166,33 @@ export default function App() {
       draggingRef.current = false
       const v = dragValueRef.current
       if (v) window.vault.updateConfig({ ui: { geometry: { ...snap.ui.geometry, zoneWidths: v.zoneWidths } } })
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('blur', onUp)
+  }
+
+  const startPanelResize = (id: string, e: ReactMouseEvent): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    panelDragRef.current = true
+    const wrapper = (e.currentTarget as HTMLElement).parentElement as HTMLElement
+    const startY = e.clientY
+    const startH = wrapper.offsetHeight
+    const onMove = (ev: MouseEvent): void => {
+      const h = Math.max(80, Math.min(900, startH + (ev.clientY - startY)))
+      panelHeightRef.current = h
+      setLocalPanelHeights((m) => ({ ...m, [id]: h }))
+    }
+    const onUp = (): void => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('blur', onUp)
+      panelDragRef.current = false
+      const h = panelHeightRef.current
+      if (h != null) {
+        window.vault.updateConfig({ ui: { modules: { ...snap.ui.modules, [id]: { ...snap.ui.modules?.[id], grow: false, height: h } } } })
+      }
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
@@ -235,6 +267,10 @@ export default function App() {
             if (!mod) return null
             const { enabled, options } = resolveModule(mod.defaults, snap.ui.modules?.[id])
             if (!enabled) return null
+            const size = resolvePanelSize(snap.ui.modules?.[id], DEFAULT_GROW.has(id))
+            const liveH = localPanelHeights[id]
+            const pGrow = liveH != null ? false : size.grow
+            const pHeight = liveH ?? size.height
             return (
               <div
                 key={id}
@@ -263,9 +299,10 @@ export default function App() {
                   setOver(null)
                 }}
                 style={{
-                  // GROWS panels (e.g. Second Brain) soak up leftover height instead of
-                  // being crushed when the window shrinks — the zone scrolls instead
-                  flex: GROWS.has(id) ? '1 0 auto' : '0 0 auto',
+                  position: 'relative',
+                  // a growing panel soaks leftover height; a fixed-height panel is that
+                  // tall and scrolls inside; otherwise it hugs its content
+                  flex: pGrow ? '1 0 auto' : pHeight != null ? `0 0 ${pHeight}px` : '0 0 auto',
                   display: 'flex',
                   flexDirection: 'column',
                   opacity: drag === id ? 0.35 : 1,
@@ -274,15 +311,23 @@ export default function App() {
                   transition: 'opacity 120ms ease'
                 }}
               >
-                <span
-                  className="grip"
-                  title="drag to rearrange"
-                  onMouseDown={() => setArmed(id)}
-                  onMouseUp={() => setArmed(null)}
-                >
-                  ⠿
-                </span>
-                {mod.render(snap, options, { chart, setChart, coreMax: geo.coreMax })}
+                <div style={{ flex: 1, minHeight: 0, overflowY: pHeight != null ? 'auto' : 'visible', display: 'flex', flexDirection: 'column' }}>
+                  <span
+                    className="grip"
+                    title="drag to rearrange"
+                    onMouseDown={() => setArmed(id)}
+                    onMouseUp={() => setArmed(null)}
+                  >
+                    ⠿
+                  </span>
+                  {mod.render(snap, options, { chart, setChart, coreMax: geo.coreMax })}
+                </div>
+                <div
+                  className="panel-vresize"
+                  title="drag to resize height"
+                  onMouseDown={(e) => startPanelResize(id, e)}
+                  style={{ position: 'absolute', left: 0, right: 0, bottom: -3, height: 6, cursor: 'row-resize', zIndex: 4 }}
+                />
               </div>
             )
           })}
