@@ -1,9 +1,10 @@
 import { app, BrowserWindow, ipcMain, shell, Tray } from 'electron'
 import { join, resolve, sep } from 'node:path'
 import { IPC } from '@shared/ipc'
-import type { CustomSprite, Directive, RepoConfig, VaultHudConfig } from '@shared/types'
+import type { CustomSprite, Directive, RepoConfig, ThemeDef, VaultHudConfig } from '@shared/types'
 import { loadOrCreateConfig, saveConfig, CONFIG_PATH } from './config'
 import { loadSprites, saveSprite as persistSprite, deleteSprite as removeSprite } from './sprites'
+import { writeTheme } from './collectors/themes'
 import { HudState } from './state'
 import { appendCapture, setDirectiveDone } from './collectors/vault'
 import { setupTray } from './tray'
@@ -94,6 +95,14 @@ app.whenReady().then(async () => {
       await state.refreshVault()
     } catch (e) {
       console.error('vault-hud: saveSprite failed', e)
+    }
+  })
+  ipcMain.on(IPC.writeTheme, async (_e, payload: { name: string; def: ThemeDef }) => {
+    try {
+      await writeTheme(payload.name, payload.def)
+      await state.refreshAll()
+    } catch (e) {
+      console.error('vault-hud: writeTheme failed', e)
     }
   })
   ipcMain.on(IPC.deleteSprite, async (_e, name: string) => {

@@ -42,4 +42,10 @@ describe('parseRice', () => {
     expect(parseRice('[]').ok).toBe(false)
     expect(parseRice('42').ok).toBe(false)
   })
+  it('fail-soft: non-array sprites → error (no partial apply)', () => {
+    expect(parseRice(JSON.stringify({ v: 1, ui: { theme: 'x' }, sprites: 42 })).ok).toBe(false)
+  })
+  it('fail-soft: non-object themes → error', () => {
+    expect(parseRice(JSON.stringify({ v: 1, ui: { theme: 'x' }, themes: [] })).ok).toBe(false)
+  })
 })

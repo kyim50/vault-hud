@@ -1,4 +1,4 @@
-import type { Density, HudSnapshot } from '@shared/types'
+import type { Density, HudSnapshot, ThemeDef } from '@shared/types'
 import { BUILTINS } from '../../theme/builtins'
 import { Section, Row, Chips, Toggle, Picker } from './primitives'
 
@@ -7,9 +7,9 @@ export function AppearanceTab({ snap }: { snap: HudSnapshot }) {
   const activeName = snap.ui.theme
   const userDef = snap.userThemes[activeName]
   const editable = !!userDef // built-ins (terminal/paper) are not in userThemes
-  const patchTheme = (patch: Record<string, unknown>): void => {
+  const patchTheme = (patch: Partial<ThemeDef>): void => {
     if (!userDef) return
-    window.vault.updateConfig({ ui: { themes: { ...snap.ui.themes, [activeName]: { ...userDef, ...patch } } } })
+    window.vault.writeTheme(activeName, { ...userDef, ...patch })
   }
   const FONTS = ['', 'ui-monospace', 'Menlo', 'Consolas', 'Courier New']
   return (

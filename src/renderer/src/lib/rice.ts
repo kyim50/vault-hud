@@ -29,5 +29,9 @@ export function parseRice(text: string): { ok: true; bundle: RiceBundle } | { ok
   const b = parsed as Partial<RiceBundle>
   if (b.v !== 1) return { ok: false, error: 'unsupported rice version' }
   if (typeof b.ui !== 'object' || b.ui === null) return { ok: false, error: 'missing ui' }
+  if (b.sprites !== undefined && !Array.isArray(b.sprites)) return { ok: false, error: 'sprites must be an array' }
+  if (b.themes !== undefined && (typeof b.themes !== 'object' || b.themes === null || Array.isArray(b.themes))) {
+    return { ok: false, error: 'themes must be an object' }
+  }
   return { ok: true, bundle: { v: 1, ui: b.ui as UiConfig, themes: b.themes, sprites: b.sprites } }
 }

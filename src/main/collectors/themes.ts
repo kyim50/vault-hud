@@ -34,6 +34,17 @@ export function parseThemeDef(name: string, text: string): ThemeDef | null {
   return { ...def, name: typeof def.name === 'string' && def.name.trim() ? def.name : name }
 }
 
+// write a user theme to its folder file — the authoritative source (folder
+// wins over inline), so in-app theme edits must land here. `name` is sanitized
+// to a bare stem to keep the write inside the themes folder (no path traversal).
+export async function writeTheme(name: string, def: ThemeDef): Promise<void> {
+  const stem = String(name).replace(/[^a-z0-9_-]/gi, '').slice(0, 32)
+  if (!stem) return
+  const dir = themesDir()
+  await fs.mkdir(dir, { recursive: true })
+  await fs.writeFile(join(dir, `${stem}.json`), JSON.stringify({ ...def, name: def.name ?? stem }, null, 2))
+}
+
 // pure: folder themes win over inline themes of the same key
 export function mergeThemes(
   inline: Record<string, ThemeDef> | undefined,
