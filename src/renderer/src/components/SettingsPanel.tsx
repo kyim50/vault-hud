@@ -4,6 +4,7 @@ import { AppearanceTab } from './settings/AppearanceTab'
 import { LayoutTab } from './settings/LayoutTab'
 import { ScenesTab } from './settings/ScenesTab'
 import { SpritesTab } from './settings/SpritesTab'
+import { ShareTab } from './settings/ShareTab'
 
 type Tab = 'appearance' | 'layout' | 'scenes' | 'sprites' | 'share'
 const TABS: Tab[] = ['appearance', 'layout', 'scenes', 'sprites', 'share']
@@ -40,7 +41,7 @@ export function SettingsPanel({ snap, onClose }: { snap: HudSnapshot; onClose: (
           {tab === 'scenes' && <ScenesTab snap={snap} />}
           {tab === 'sprites' && <SpritesTab snap={snap} />}
           {tab === 'layout' && <LayoutTab snap={snap} />}
-          {tab === 'share' && <div className="dim" style={{ fontSize: 11, padding: 8 }}>share — coming in this build</div>}
+          {tab === 'share' && <ShareTab snap={snap} />}
         </div>
       </div>
     </div>
