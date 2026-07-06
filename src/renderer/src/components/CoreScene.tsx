@@ -955,7 +955,19 @@ export function CoreScene({
       ...Object.fromEntries(
         customList.map((s) => [
           s.name,
-          { name: s.name, horizon: Math.round(H * 0.78), draw: (c: Ctx, f: number) => drawCustomScene(c, s, spritesByName, f, W, H) }
+          {
+            name: s.name,
+            horizon: Math.round(H * 0.78),
+            // guard the custom draw so a malformed scene can never throw out of
+            // the render loop and freeze the whole Core (defense-in-depth)
+            draw: (c: Ctx, f: number): void => {
+              try {
+                drawCustomScene(c, s, spritesByName, f, W, H)
+              } catch {
+                /* a bad custom scene is skipped, not fatal */
+              }
+            }
+          }
         ])
       )
     }),

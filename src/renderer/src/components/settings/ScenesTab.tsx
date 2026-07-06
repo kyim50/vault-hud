@@ -102,7 +102,7 @@ export function ScenesTab({ snap }: { snap: HudSnapshot }) {
         )}
         {draft && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, border: '1px solid var(--line-soft)', padding: 10 }}>
-            <canvas ref={(el) => { previewRef.current = el; drawPreview(el) }} width={220} height={132} style={{ width: 220, height: 132, imageRendering: 'pixelated', border: '1px solid var(--line-soft)', alignSelf: 'center' }} />
+            <canvas ref={(el) => { previewRef.current = el; drawPreview(el) }} width={192} height={108} style={{ width: 240, height: 135, imageRendering: 'pixelated', border: '1px solid var(--line-soft)', alignSelf: 'center' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 10 }}>
               <span className="dim">name</span>
               <input value={draft.name} maxLength={16} onChange={(e) => patchDraft({ name: e.target.value })}

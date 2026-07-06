@@ -23,6 +23,16 @@ describe('resolveCustomScene', () => {
     expect(r?.sky).toEqual(['#12131a', '#05060a'])
     expect(r?.ground).toBe('#0e1013')
   })
+  it('rejects 5- and 7-digit hex (invalid CSS — would throw in addColorStop)', () => {
+    const r = resolveCustomScene({ name: 'x', sky: ['#12345', '#1234567'], ground: '#abcde', props: [] }, sprites, reserved)
+    expect(r?.sky).toEqual(['#12131a', '#05060a'])
+    expect(r?.ground).toBe('#0e1013')
+  })
+  it('accepts valid 3/4/6/8-digit hex', () => {
+    const r = resolveCustomScene({ name: 'x', sky: ['#abc', '#abcd'], ground: '#aabbccdd', props: [] }, sprites, reserved)
+    expect(r?.sky).toEqual(['#abc', '#abcd'])
+    expect(r?.ground).toBe('#aabbccdd')
+  })
   it('rejects empty / non-string / reserved names → null', () => {
     expect(resolveCustomScene({ ...ok, name: '' }, sprites, reserved)).toBeNull()
     expect(resolveCustomScene({ ...ok, name: 5 }, sprites, reserved)).toBeNull()

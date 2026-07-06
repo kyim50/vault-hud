@@ -3,8 +3,10 @@ import type { CustomScene, SceneProp } from '@shared/types'
 const SKY_DEFAULT: [string, string] = ['#12131a', '#05060a']
 const GROUND_DEFAULT = '#0e1013'
 
+// only valid CSS hex lengths (3/4/6/8) — 5- and 7-digit strings are NOT valid
+// colors and would throw in ctx.addColorStop (freezing the scene loop)
 const hex = (v: unknown, fallback: string): string =>
-  typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(v.trim()) ? v.trim() : fallback
+  typeof v === 'string' && /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v.trim()) ? v.trim() : fallback
 const clamp = (v: unknown, min: number, max: number, def: number): number =>
   typeof v === 'number' && Number.isFinite(v) ? Math.max(min, Math.min(max, v)) : def
 
