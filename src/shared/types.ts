@@ -48,6 +48,8 @@ export interface AudioConfig {
 export interface ModuleConfig {
   enabled?: boolean
   options?: Record<string, unknown>
+  grow?: boolean // fill leftover column height (default: id ∈ DEFAULT_GROW)
+  height?: number // fixed px height (panel scrolls inside); ignored when grow is true
 }
 
 export interface SceneConfig {
@@ -63,6 +65,12 @@ export interface GeometryConfig {
   coreMax?: number // px, Core canvas max width
   leftWidth?: number // legacy — migrated to zoneWidths
   rightWidth?: number // legacy
+}
+
+export interface NotchConfig {
+  enabled?: boolean // create the notch window at all (default true)
+  width?: number // px, default 440
+  expandedHeight?: number // px below the menu-bar height, default 140
 }
 
 export type Density = 'compact' | 'cozy' | 'airy'
@@ -102,6 +110,7 @@ export interface UiConfig {
   themes?: Record<string, ThemeDef> // inline user themes (folder themes merge over these)
   scenes?: SceneConfig
   geometry?: GeometryConfig
+  notch?: NotchConfig
 }
 
 // A self-contained shareable "rice": the whole look in one JSON.
