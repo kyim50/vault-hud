@@ -1,17 +1,20 @@
 import { app, BrowserWindow, ipcMain, shell, Tray } from 'electron'
 import { join, resolve, sep } from 'node:path'
 import { IPC } from '@shared/ipc'
-import type { CustomSprite, Directive, RepoConfig, VaultHudConfig } from '@shared/types'
+import type { CustomSprite, Directive, RepoConfig, ThemeDef, VaultHudConfig } from '@shared/types'
 import { loadOrCreateConfig, saveConfig, CONFIG_PATH } from './config'
 import { loadSprites, saveSprite as persistSprite, deleteSprite as removeSprite } from './sprites'
+import { writeTheme } from './collectors/themes'
 import { HudState } from './state'
 import { appendCapture, setDirectiveDone } from './collectors/vault'
 import { setupTray } from './tray'
-import { createNotchWindow } from './notch'
+import { createNotchWindow, applyNotchBounds } from './notch'
+import { resolveNotch } from '@shared/resolveNotch'
 
 let state: HudState
 let tray: Tray
 let hudWin: BrowserWindow | null = null
+let notchWin: BrowserWindow | null = null
 
 function createHudWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -84,6 +87,9 @@ app.whenReady().then(async () => {
       if (Array.isArray(patch.repos)) config.repos = patch.repos
       await saveConfig(config)
       await state.refreshAll()
+      if (patch.ui?.notch && notchWin && !notchWin.isDestroyed()) {
+        applyNotchBounds(notchWin, resolveNotch(config.ui.notch))
+      }
     } catch (e) {
       console.error('vault-hud: updateConfig failed', e)
     }
@@ -94,6 +100,14 @@ app.whenReady().then(async () => {
       await state.refreshVault()
     } catch (e) {
       console.error('vault-hud: saveSprite failed', e)
+    }
+  })
+  ipcMain.on(IPC.writeTheme, async (_e, payload: { name: string; def: ThemeDef }) => {
+    try {
+      await writeTheme(payload.name, payload.def)
+      await state.refreshAll()
+    } catch (e) {
+      console.error('vault-hud: writeTheme failed', e)
     }
   })
   ipcMain.on(IPC.deleteSprite, async (_e, name: string) => {
@@ -131,7 +145,8 @@ app.whenReady().then(async () => {
     }
   }
   tray = setupTray(state, showHud)
-  createNotchWindow()
+  const nc = resolveNotch(config.ui.notch)
+  if (nc.enabled) notchWin = createNotchWindow(nc)
 
   void state.start()
 

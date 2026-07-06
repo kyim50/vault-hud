@@ -1,5 +1,16 @@
-import { useEffect, useState, type DragEvent, type ReactNode } from 'react'
-import type { HudSnapshot, PanelLayout } from '@shared/types'
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode
+} from 'react'
+import { resolveGeometry, GEOMETRY_BOUNDS, type ResolvedGeometry } from '../lib/resolveGeometry'
+import { resolveLayout } from '../lib/resolveLayout'
+import { resolvePanelSize, DEFAULT_GROW } from '../lib/resolvePanelSize'
 import { useSnapshot } from '../lib/useSnapshot'
 import { Panel } from '../components/Panel'
 import { VitalsPanel } from '../components/VitalsPanel'
@@ -14,40 +25,66 @@ import { HudFrame } from '../components/HudFrame'
 import { SkillsPanel } from '../components/SkillsPanel'
 import { TotemPanel } from '../components/TotemPanel'
 import { SettingsPanel } from '../components/SettingsPanel'
+import { VaultfetchPanel, DEFAULT_FETCH_OPTIONS, type FetchOptions } from '../components/VaultfetchPanel'
 import { lofi } from '../lib/audio'
+import type { HudModule, RenderContext } from '../modules/types'
+import { resolveModule } from '../modules/resolve'
+import { BUILTINS } from '../theme/builtins'
+import { resolve } from '../theme/resolve'
+import { applyTheme } from '../theme/apply'
+import { setSceneColors } from '../theme/sceneColors'
 
-// the two side columns render these panels in user-chosen order (drag the
-// ⠿ grip); the order persists in config as ui.layout
-const PANELS: Record<string, (s: HudSnapshot) => ReactNode> = {
-  vitals: (s) => <VitalsPanel repos={s.repos} usage={s.usage} audio={s.ui.audio} />,
-  directives: (s) => <DirectivesPanel directives={s.directives} />,
-  brain: (s) => <SecondBrainPanel recent={s.brain.recent} resurfaced={s.brain.resurfaced} />,
-  deck: (s) => <CommandDeck commands={s.commands} />,
-  schedule: (s) => <SchedulePanel schedule={s.schedule} />,
-  skills: (s) => <SkillsPanel skills={s.skills} />,
-  totem: (s) => <TotemPanel sprite={s.sprites.find((sp) => sp.use === 'totem')} />
-}
-const DEFAULT_LAYOUT: PanelLayout = {
-  left: ['vitals', 'directives', 'brain'],
-  right: ['deck', 'schedule', 'totem', 'skills']
-}
-// these two soak up leftover column height; the rest hug their content
-const GROWS = new Set(['brain', 'skills'])
-
-// a stored layout may be stale (edited config, renamed panels): keep known
-// ids once each, then append anything missing to its default column
-function sanitizeLayout(l?: PanelLayout): PanelLayout {
-  const seen = new Set<string>()
-  const clean = (arr: unknown): string[] =>
-    (Array.isArray(arr) ? arr : []).filter(
-      (id): id is string => typeof id === 'string' && id in PANELS && !seen.has(id) && !!seen.add(id)
+// any module can live in any zone, in any order — drag a panel's ⠿ grip to
+// move it between zones; the placement persists in config.ui.layout.zones,
+// and each module's enabled/options come from config.ui.modules[id] (see resolveModule)
+const MODULES: Record<string, HudModule<any>> = {
+  fetch: { id: 'fetch', defaults: DEFAULT_FETCH_OPTIONS, render: (s, o: FetchOptions) => <VaultfetchPanel snap={s} opts={o} /> },
+  vitals: { id: 'vitals', defaults: {}, render: (s) => <VitalsPanel repos={s.repos} usage={s.usage} audio={s.ui.audio} /> },
+  directives: { id: 'directives', defaults: {}, render: (s) => <DirectivesPanel directives={s.directives} /> },
+  brain: { id: 'brain', defaults: {}, render: (s) => <SecondBrainPanel recent={s.brain.recent} resurfaced={s.brain.resurfaced} /> },
+  deck: { id: 'deck', defaults: {}, render: (s) => <CommandDeck commands={s.commands} /> },
+  schedule: { id: 'schedule', defaults: {}, render: (s) => <SchedulePanel schedule={s.schedule} /> },
+  skills: { id: 'skills', defaults: {}, render: (s) => <SkillsPanel skills={s.skills} /> },
+  totem: { id: 'totem', defaults: {}, render: (s) => <TotemPanel sprite={s.sprites.find((sp) => sp.use === 'totem')} /> },
+  core: {
+    id: 'core',
+    defaults: {},
+    render: (s, _o: Record<string, never>, ctx: RenderContext) => (
+      <Panel
+        title="Core"
+        corner={
+          <span>
+            {s.mood === 'napping' ? 'RESTING' : 'ALIVE'} ·{' '}
+            <span
+              onClick={() => ctx.setChart((c) => !c)}
+              className={ctx.chart ? 'clay' : 'dim'}
+              style={{ cursor: 'pointer', userSelect: 'none' }}
+              title={ctx.chart ? 'back to the scene (esc)' : 'browse the wiki-link star chart'}
+            >
+              ✦ CHART
+            </span>
+          </span>
+        }
+        style={{ flex: 1, border: 'none', padding: '8px 0' }}
+      >
+        <CoreScene
+          usagePercent={s.usage.percent}
+          busy={s.commands.some((c) => c.status.state === 'running')}
+          mood={s.mood}
+          loot={s.loot}
+          graph={s.graph}
+          chart={ctx.chart}
+          scenes={s.ui.scenes}
+          maxWidth={ctx.coreMax}
+        />
+        <div style={{ borderTop: '1px dotted var(--line-soft)', paddingTop: 8 }}>
+          <PrimaryDirective {...s.primary} />
+        </div>
+      </Panel>
     )
-  const left = clean(l?.left)
-  const right = clean(l?.right)
-  for (const id of DEFAULT_LAYOUT.left) if (!seen.has(id)) left.push(id)
-  for (const id of DEFAULT_LAYOUT.right) if (!seen.has(id)) right.push(id)
-  return { left, right }
+  }
 }
+const VALID_IDS = new Set(Object.keys(MODULES))
 
 export default function App() {
   const snap = useSnapshot()
@@ -62,108 +99,272 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   // optimistic layout: a drop applies instantly, config catches up async
-  const [localLayout, setLocalLayout] = useState<PanelLayout | null>(null)
+  const [localLayout, setLocalLayout] = useState<string[][] | null>(null)
   const [drag, setDrag] = useState<string | null>(null)
   const [armed, setArmed] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
-  useEffect(() => {
-    if (snap) document.body.dataset.theme = snap.ui.theme
-  }, [snap?.ui.theme])
+  const [localGeometry, setLocalGeometry] = useState<ResolvedGeometry | null>(null)
+  const draggingRef = useRef(false)
+  const dragValueRef = useRef<ResolvedGeometry | null>(null)
+  const [localPanelHeights, setLocalPanelHeights] = useState<Record<string, number>>({})
+  const panelDragRef = useRef(false)
+  const panelHeightRef = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    if (!snap) return
+    try {
+      const defs = { ...BUILTINS, ...snap.userThemes }
+      const resolved = resolve(defs[snap.ui.theme] ?? BUILTINS.terminal)
+      applyTheme(resolved)
+      setSceneColors(resolved)
+    } catch {
+      // malformed user theme (e.g. a non-string color value) — never blank the HUD
+      const fallback = resolve(BUILTINS.terminal)
+      applyTheme(fallback)
+      setSceneColors(fallback)
+    }
+  }, [snap?.ui.theme, snap?.userThemes])
   // ambient synth follows the persisted audio config
   useEffect(() => {
     if (snap) lofi.apply(snap.ui.audio)
   }, [snap?.ui.audio?.mode, snap?.ui.audio?.volume])
+  // once a drag or a Settings change lands in the snapshot, the optimistic
+  // local value yields to config (guarded so a mid-drag snapshot doesn't interrupt)
+  useEffect(() => {
+    if (!draggingRef.current) setLocalGeometry(null)
+  }, [JSON.stringify(snap?.ui.geometry)])
+  useEffect(() => {
+    if (!panelDragRef.current) setLocalPanelHeights({})
+  }, [JSON.stringify(snap?.ui.modules)])
   if (!snap) return <p style={{ padding: 16 }}>booting…</p>
 
-  const layout = localLayout ?? sanitizeLayout(snap.ui.layout)
+  const zones = localLayout ?? resolveLayout(snap.ui.layout, VALID_IDS)
+  const coreZone = zones.findIndex((z) => z.includes('core'))
 
-  const move = (dragId: string, col: 'left' | 'right', before?: string): void => {
-    const left = layout.left.filter((id) => id !== dragId)
-    const right = layout.right.filter((id) => id !== dragId)
-    const arr = col === 'left' ? left : right
-    const at = before ? arr.indexOf(before) : -1
-    arr.splice(at < 0 ? arr.length : at, 0, dragId)
-    const next = { left, right }
-    setLocalLayout(next)
-    window.vault.updateConfig({ ui: { layout: next } })
+  const geo = localGeometry ?? resolveGeometry(snap.ui.geometry, zones.length, coreZone)
+
+  const startResize = (zoneIdx: number, e: ReactMouseEvent): void => {
+    e.preventDefault()
+    draggingRef.current = true
+    const base = localGeometry ?? resolveGeometry(snap.ui.geometry, zones.length, coreZone)
+    const startX = e.clientX
+    const startW = base.zoneWidths[zoneIdx]
+    const [min, max] = GEOMETRY_BOUNDS.zoneWidth
+    // zones left of the flex zone widen when dragged right; zones right of it widen when dragged left
+    const dir = zoneIdx < base.flexZone ? 1 : -1
+    const onMove = (ev: MouseEvent): void => {
+      const w = Math.max(min, Math.min(max, startW + dir * (ev.clientX - startX)))
+      const nextWidths = base.zoneWidths.slice()
+      nextWidths[zoneIdx] = w
+      const next = { ...base, zoneWidths: nextWidths }
+      dragValueRef.current = next
+      setLocalGeometry(next)
+    }
+    const onUp = (): void => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('blur', onUp)
+      draggingRef.current = false
+      const v = dragValueRef.current
+      if (v) window.vault.updateConfig({ ui: { geometry: { ...snap.ui.geometry, zoneWidths: v.zoneWidths } } })
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('blur', onUp)
   }
 
-  const renderColumn = (col: 'left' | 'right'): ReactNode => (
-    <div
-      onDragOver={(e) => {
-        if (drag) {
-          e.preventDefault()
-          setOver(`col:${col}`)
-        }
-      }}
-      onDragLeave={() => setOver(null)}
-      onDrop={(e) => {
-        e.preventDefault()
-        if (drag) move(drag, col)
-        setOver(null)
-      }}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        minHeight: 0,
-        overflowY: 'auto',
-        outline: over === `col:${col}` ? '1px dashed var(--clay)' : 'none',
-        outlineOffset: 2
-      }}
-    >
-      {layout[col].map((id) => (
+  const startPanelResize = (id: string, e: ReactMouseEvent): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    panelDragRef.current = true
+    const wrapper = (e.currentTarget as HTMLElement).parentElement as HTMLElement
+    const startY = e.clientY
+    const startH = wrapper.offsetHeight
+    const onMove = (ev: MouseEvent): void => {
+      const h = Math.max(80, Math.min(900, startH + (ev.clientY - startY)))
+      panelHeightRef.current = h
+      setLocalPanelHeights((m) => ({ ...m, [id]: h }))
+    }
+    const onUp = (): void => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('blur', onUp)
+      panelDragRef.current = false
+      const h = panelHeightRef.current
+      if (h != null) {
+        window.vault.updateConfig({ ui: { modules: { ...snap.ui.modules, [id]: { ...snap.ui.modules?.[id], grow: false, height: h } } } })
+      }
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('blur', onUp)
+  }
+
+  const move = (dragId: string, zoneIdx: number, before?: string): void => {
+    const next = zones.map((z) => z.filter((id) => id !== dragId))
+    const arr = next[zoneIdx] ?? next[0]
+    const at = before ? arr.indexOf(before) : -1
+    arr.splice(at < 0 ? arr.length : at, 0, dragId)
+    setLocalLayout(next)
+    window.vault.updateConfig({ ui: { layout: { zones: next } } })
+  }
+
+  // add/remove a zone, keeping zoneWidths + flexZone aligned with the new zone
+  // indices; applied optimistically (local state) so the flex column doesn't
+  // flash the wrong width for a frame before the config round-trip lands
+  const applyZones = (next: string[][], widths: number[], flexZone: number): void => {
+    setLocalLayout(next)
+    setLocalGeometry({ zoneWidths: widths, flexZone, coreMax: geo.coreMax })
+    window.vault.updateConfig({
+      ui: { layout: { zones: next }, geometry: { ...snap.ui.geometry, zoneWidths: widths, flexZone } }
+    })
+  }
+
+  const addZone = (): void => {
+    // append an empty zone at the end — existing indices and the flex zone are unaffected
+    applyZones([...zones, []], [...geo.zoneWidths, 260], geo.flexZone)
+  }
+
+  const removeZone = (zoneIdx: number): void => {
+    if (zones.length <= 1) return // never remove the last zone
+    const next = zones.filter((_, i) => i !== zoneIdx)
+    const widths = geo.zoneWidths.filter((_, i) => i !== zoneIdx)
+    // keep the flex zone pointing at the same logical column after the splice
+    const flexZone = Math.max(0, Math.min(next.length - 1, zoneIdx < geo.flexZone ? geo.flexZone - 1 : geo.flexZone))
+    applyZones(next, widths, flexZone)
+  }
+
+  const renderZone = (zoneIdx: number): ReactNode => {
+    const isFlex = zoneIdx === geo.flexZone
+    const handleSide = zoneIdx < geo.flexZone ? 'right' : 'left'
+    return (
+      <div style={{ position: 'relative', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <div
-          key={id}
-          className="arrange"
-          draggable={armed === id}
-          onDragStart={(e: DragEvent) => {
-            e.dataTransfer.effectAllowed = 'move'
-            setDrag(id)
-          }}
-          onDragEnd={() => {
-            setDrag(null)
-            setArmed(null)
-            setOver(null)
-          }}
           onDragOver={(e) => {
-            if (drag && drag !== id) {
+            if (drag) {
               e.preventDefault()
-              e.stopPropagation()
-              setOver(id)
+              setOver(`zone:${zoneIdx}`)
             }
           }}
+          onDragLeave={() => setOver(null)}
           onDrop={(e) => {
             e.preventDefault()
-            e.stopPropagation()
-            if (drag && drag !== id) move(drag, col, id)
+            if (drag) move(drag, zoneIdx)
             setOver(null)
           }}
           style={{
-            // never squish panels when the window shrinks — the column
-            // scrolls instead (this was crushing Second Brain on resize)
-            flex: GROWS.has(id) ? '1 0 auto' : '0 0 auto',
             display: 'flex',
             flexDirection: 'column',
-            opacity: drag === id ? 0.35 : 1,
-            outline: over === id ? '1px dashed var(--clay)' : 'none',
-            outlineOffset: 1,
-            transition: 'opacity 120ms ease'
+            gap: 8,
+            minHeight: 0,
+            flex: 1,
+            overflowY: 'auto',
+            outline: over === `zone:${zoneIdx}` ? '1px dashed var(--clay)' : 'none',
+            outlineOffset: 2
           }}
         >
-          <span
-            className="grip"
-            title="drag to rearrange"
-            onMouseDown={() => setArmed(id)}
-            onMouseUp={() => setArmed(null)}
-          >
-            ⠿
-          </span>
-          {PANELS[id](snap)}
+          {zones[zoneIdx].map((id) => {
+            const mod = MODULES[id]
+            if (!mod) return null
+            const { enabled, options } = resolveModule(mod.defaults, snap.ui.modules?.[id])
+            if (!enabled) return null
+            const size = resolvePanelSize(snap.ui.modules?.[id], DEFAULT_GROW.has(id))
+            const liveH = localPanelHeights[id]
+            const pGrow = liveH != null ? false : size.grow
+            const pHeight = liveH ?? size.height
+            return (
+              <div
+                key={id}
+                className="arrange"
+                draggable={armed === id}
+                onDragStart={(e: DragEvent) => {
+                  e.dataTransfer.effectAllowed = 'move'
+                  setDrag(id)
+                }}
+                onDragEnd={() => {
+                  setDrag(null)
+                  setArmed(null)
+                  setOver(null)
+                }}
+                onDragOver={(e) => {
+                  if (drag && drag !== id) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setOver(id)
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (drag && drag !== id) move(drag, zoneIdx, id)
+                  setOver(null)
+                }}
+                style={{
+                  position: 'relative',
+                  // a growing panel soaks leftover height; a fixed-height panel is that
+                  // tall and scrolls inside; otherwise it hugs its content
+                  flex: pGrow ? '1 0 auto' : pHeight != null ? `0 0 ${pHeight}px` : '0 0 auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  opacity: drag === id ? 0.35 : 1,
+                  outline: over === id ? '1px dashed var(--clay)' : 'none',
+                  outlineOffset: 1,
+                  transition: 'opacity 120ms ease'
+                }}
+              >
+                <div style={{ flex: 1, minHeight: 0, overflowY: pHeight != null ? 'auto' : 'visible', display: 'flex', flexDirection: 'column' }}>
+                  <span
+                    className="grip"
+                    title="drag to rearrange"
+                    onMouseDown={() => setArmed(id)}
+                    onMouseUp={() => setArmed(null)}
+                  >
+                    ⠿
+                  </span>
+                  {mod.render(snap, options, { chart, setChart, coreMax: geo.coreMax })}
+                </div>
+                <div
+                  className="panel-vresize"
+                  title="drag to resize height"
+                  onMouseDown={(e) => startPanelResize(id, e)}
+                  style={{ position: 'absolute', left: 0, right: 0, bottom: -3, height: 6, cursor: 'row-resize', zIndex: 4 }}
+                />
+              </div>
+            )
+          })}
+          {zones[zoneIdx].length === 0 && (
+            <div
+              className="dim"
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                border: '1px dashed var(--line-soft)',
+                fontSize: 10
+              }}
+            >
+              <span>drop a panel here</span>
+              {zones.length > 1 && (
+                <button onClick={() => removeZone(zoneIdx)} style={{ fontSize: 10 }} title="remove this zone">
+                  ✕ remove zone
+                </button>
+              )}
+            </div>
+          )}
         </div>
-      ))}
-    </div>
-  )
+        {!isFlex && (
+          <div
+            className="resize-handle"
+            title="drag to resize"
+            onMouseDown={(e) => startResize(zoneIdx, e)}
+            style={{ position: 'absolute', top: 0, bottom: 0, width: 8, [handleSide]: -8, cursor: 'col-resize', zIndex: 5 }}
+          />
+        )}
+      </div>
+    )
+  }
 
   return (
     <>
@@ -175,7 +376,7 @@ export default function App() {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '280px 1fr 300px',
+        gridTemplateColumns: geo.zoneWidths.map((w, i) => (i === geo.flexZone ? '1fr' : `${w}px`)).join(' '),
         gridTemplateRows: snap.configCreated ? '40px auto 1fr' : '40px 1fr',
         gap: 8,
         height: '100vh',
@@ -202,6 +403,9 @@ export default function App() {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={addZone} style={{ fontFamily: 'var(--font-pixel)', fontSize: 8, padding: '5px 8px', letterSpacing: 1 }} title="add a zone">
+            + ZONE
+          </button>
           <button
             onClick={() => setSettingsOpen(true)}
             style={{ fontFamily: 'var(--font-pixel)', fontSize: 8, padding: '5px 8px', letterSpacing: 1 }}
@@ -225,39 +429,11 @@ export default function App() {
           prune repos, set your vault path, and tune the primary directive. Restart after editing.
         </div>
       )}
-      {renderColumn('left')}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
-        <Panel
-          title="Core"
-          corner={
-            <span>
-              {snap.mood === 'napping' ? 'RESTING' : 'ALIVE'} ·{' '}
-              <span
-                onClick={() => setChart((c) => !c)}
-                className={chart ? 'clay' : 'dim'}
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-                title={chart ? 'back to the scene (esc)' : 'browse the wiki-link star chart'}
-              >
-                ✦ CHART
-              </span>
-            </span>
-          }
-          style={{ flex: 1, border: 'none', padding: '8px 0' }}
-        >
-          <CoreScene
-            usagePercent={snap.usage.percent}
-            busy={snap.commands.some((c) => c.status.state === 'running')}
-            mood={snap.mood}
-            loot={snap.loot}
-            graph={snap.graph}
-            chart={chart}
-          />
-          <div style={{ borderTop: '1px dotted var(--line-soft)', paddingTop: 8 }}>
-            <PrimaryDirective {...snap.primary} />
-          </div>
-        </Panel>
+      <div style={{ display: 'contents' }}>
+        {zones.map((_, i) => (
+          <Fragment key={i}>{renderZone(i)}</Fragment>
+        ))}
       </div>
-      {renderColumn('right')}
     </div>
     {settingsOpen && <SettingsPanel snap={snap} onClose={() => setSettingsOpen(false)} />}
     </>

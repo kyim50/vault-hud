@@ -1,4 +1,4 @@
-import type { AiConfig, CustomSprite, Directive, HudSnapshot, RepoConfig, UiConfig } from './types'
+import type { AiConfig, CustomSprite, Directive, HudSnapshot, RepoConfig, ThemeDef, UiConfig } from './types'
 
 export const IPC = {
   getSnapshot: 'hud:getSnapshot',
@@ -10,6 +10,7 @@ export const IPC = {
   updateConfig: 'config:update',
   saveSprite: 'sprite:save',
   deleteSprite: 'sprite:delete',
+  writeTheme: 'theme:write',
   capture: 'vault:capture'
 } as const
 
@@ -23,6 +24,7 @@ export interface VaultApi {
   updateConfig(patch: { ui?: Partial<UiConfig>; ai?: Partial<AiConfig>; petName?: string; repos?: RepoConfig[] }): void
   saveSprite(sprite: CustomSprite): void
   deleteSprite(name: string): void
+  writeTheme(name: string, def: ThemeDef): void
   capture(text: string): void
 }
 

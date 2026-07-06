@@ -47,7 +47,7 @@ export function HudFrame({
 }: {
   critters: boolean
   sprites: { name: string; grid: string[][] }[]
-  theme: 'terminal' | 'paper'
+  theme: string
 }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const spritesRef = useRef(sprites)

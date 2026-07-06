@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '@shared/ipc'
-import type { CustomSprite, Directive, HudSnapshot } from '@shared/types'
+import type { CustomSprite, Directive, HudSnapshot, ThemeDef } from '@shared/types'
 
 contextBridge.exposeInMainWorld('vault', {
   getSnapshot: () => ipcRenderer.invoke(IPC.getSnapshot),
@@ -16,5 +16,6 @@ contextBridge.exposeInMainWorld('vault', {
   updateConfig: (patch: unknown) => ipcRenderer.send(IPC.updateConfig, patch),
   saveSprite: (sprite: CustomSprite) => ipcRenderer.send(IPC.saveSprite, sprite),
   deleteSprite: (name: string) => ipcRenderer.send(IPC.deleteSprite, name),
+  writeTheme: (name: string, def: ThemeDef) => ipcRenderer.send(IPC.writeTheme, { name, def }),
   capture: (text: string) => ipcRenderer.send(IPC.capture, text)
 })

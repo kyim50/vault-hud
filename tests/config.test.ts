@@ -77,4 +77,11 @@ describe('mergeConfig', () => {
     expect(merged.appName).toBe('Mine')
     expect(merged.repos).toEqual(repos)
   })
+
+  it('preserves ui.modules through a load (fail-soft rice slice)', () => {
+    const raw = { ui: { theme: 'terminal', parade: true, modules: { fetch: { enabled: false, options: { showLogo: false } } } } }
+    const cfg = mergeConfig(raw, defaults)
+    expect(cfg.ui.modules?.fetch?.enabled).toBe(false)
+    expect(cfg.ui.modules?.fetch?.options).toEqual({ showLogo: false })
+  })
 })

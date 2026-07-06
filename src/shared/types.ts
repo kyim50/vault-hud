@@ -32,10 +32,10 @@ export interface VaultHudConfig {
   ui: UiConfig
 }
 
-// panel ids for the two side columns, in display order (drag to rearrange)
 export interface PanelLayout {
-  left: string[]
-  right: string[]
+  zones?: string[][] // ordered zones, each an ordered list of module ids
+  left?: string[] // legacy (pre-zones) — migrated to zones, then ignored
+  right?: string[] // legacy
 }
 
 export type AudioMode = 'off' | 'hum' | 'hiss'
@@ -45,11 +45,80 @@ export interface AudioConfig {
   volume: number // 0-100
 }
 
+export interface ModuleConfig {
+  enabled?: boolean
+  options?: Record<string, unknown>
+  grow?: boolean // fill leftover column height (default: id ∈ DEFAULT_GROW)
+  height?: number // fixed px height (panel scrolls inside); ignored when grow is true
+}
+
+export interface SceneConfig {
+  rotation?: string[] // scenes that cycle, in order
+  intervalSec?: number // seconds per scene
+  busy?: string // scene shown while a command runs
+  nap?: string // scene shown after 90min idle
+}
+
+export interface GeometryConfig {
+  zoneWidths?: number[] // px per zone, index-aligned with layout.zones
+  flexZone?: number // index of the zone that soaks leftover width (the `1fr`)
+  coreMax?: number // px, Core canvas max width
+  leftWidth?: number // legacy — migrated to zoneWidths
+  rightWidth?: number // legacy
+}
+
+export interface NotchConfig {
+  enabled?: boolean // create the notch window at all (default true)
+  width?: number // px, default 440
+  expandedHeight?: number // px below the menu-bar height, default 140
+}
+
+export type Density = 'compact' | 'cozy' | 'airy'
+export interface ThemeColors {
+  bg?: string
+  surface?: string
+  ink?: string
+  inkDim?: string
+  line?: string
+  lineSoft?: string
+  accent?: string
+  accentDim?: string
+  mascotBody?: string
+  mascotBodyLight?: string
+  mascotDark?: string
+  mascotEye?: string
+  mascotMuzzle?: string
+  danger?: string
+}
+export interface ThemeFonts {
+  mono?: string
+  pixel?: string
+}
+export interface ThemeDef {
+  name?: string
+  colors?: ThemeColors
+  fonts?: ThemeFonts
+  density?: Density
+}
+
 export interface UiConfig {
-  theme: 'terminal' | 'paper'
+  theme: string // active theme name: a built-in or a user theme
   parade: boolean // critters patrol the HUD frame
   layout?: PanelLayout
   audio?: AudioConfig
+  modules?: Record<string, ModuleConfig> // per-module rice slice: enable + options
+  themes?: Record<string, ThemeDef> // inline user themes (folder themes merge over these)
+  scenes?: SceneConfig
+  geometry?: GeometryConfig
+  notch?: NotchConfig
+}
+
+// A self-contained shareable "rice": the whole look in one JSON.
+export interface RiceBundle {
+  v: 1
+  ui: UiConfig
+  themes?: Record<string, ThemeDef> // embedded theme defs so a recipient needs no theme files
+  sprites?: CustomSprite[]
 }
 
 export interface CustomSprite {
@@ -152,4 +221,7 @@ export interface HudSnapshot {
   generatedAt: number
   configCreated: boolean
   configPath: string
+  bootAt: number // main-process start time — uptime source
+  quotes: string[] // defaults merged with a vault Quotes.md when present
+  userThemes: Record<string, ThemeDef> // config.ui.themes merged with ~/.vault-hud/themes/*.json
 }

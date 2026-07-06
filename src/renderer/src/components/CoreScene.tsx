@@ -1,23 +1,19 @@
 import { useEffect, useRef } from 'react'
-import type { LinkGraph, Mood } from '@shared/types'
-import { DEFAULT_PALETTE as PAL, PANDA, PANDA_BODY_ROWS, PANDA_BUDDY, drawPanda } from '../lib/panda'
+import type { LinkGraph, Mood, SceneConfig } from '@shared/types'
+import { PANDA, PANDA_BODY_ROWS, PANDA_BUDDY, drawPanda } from '../lib/panda'
+import { sceneColors, scenePalette } from '../theme/sceneColors'
 import { layoutConstellation, hitStar, type Star } from '../lib/constellation'
 import { drawPixelText, measurePixelText } from '../lib/pixelfont'
 import { loadingPhase } from '../lib/loadingTransition'
+import { resolveScenes, ROTATION_DEFAULT } from '../lib/resolveScenes'
 
 // Halftone scene engine: the red panda living out rotating pixel scenes.
 // Dual-state canvas: hovering a Second Brain note dissolves the scene into
 // the wiki-link constellation graph; wandering off dissolves it back.
 const W = 192
 const H = 108
-const INK = '#e8e6e3'
-const BODY = '#d97757'
-const BODY_LIGHT = '#e8a284'
-const EYE = '#17160f'
-const GRAY = '#9a9a9a'
 
 const FPS = 12
-const SCENE_FRAMES = 22 * FPS
 
 function hash(x: number, y: number): number {
   let h = (x * 374761393 + y * 668265263) | 0
@@ -33,23 +29,25 @@ function wander(f: number, min: number, max: number, speed: number, phase = 0): 
 }
 
 type Ctx = CanvasRenderingContext2D
+type SceneFn = (ctx: Ctx, f: number, blink: boolean) => void
+interface SceneDef { name: string; draw: SceneFn; horizon?: number }
 
 function drawWalker(ctx: Ctx, f: number, blink: boolean, x: number, groundY: number, moving: boolean): void {
   const bob = moving ? (Math.floor(f / 3) % 2) : (Math.floor(f / 8) % 2)
-  drawPanda(ctx, PANDA, Math.round(x), groundY - PANDA.length * 2 + bob, 2, PAL, { blink, step: bob as 0 | 1 })
+  drawPanda(ctx, PANDA, Math.round(x), groundY - PANDA.length * 2 + bob, 2, scenePalette, { blink, step: bob as 0 | 1 })
 }
 
 function drawSitter(ctx: Ctx, blink: boolean, x: number, y: number): void {
-  drawPanda(ctx, PANDA.slice(0, PANDA_BODY_ROWS), Math.round(x), y, 2, PAL, { blink })
+  drawPanda(ctx, PANDA.slice(0, PANDA_BODY_ROWS), Math.round(x), y, 2, scenePalette, { blink })
 }
 
 function drawBuddy(ctx: Ctx, f: number, blink: boolean, x: number, groundY: number, hopBeat = 4): void {
   const hop = Math.floor(f / hopBeat) % 3 === 0 ? -2 : 0
-  drawPanda(ctx, PANDA_BUDDY, Math.round(x), groundY - PANDA_BUDDY.length * 2 + hop, 2, PAL, { blink })
+  drawPanda(ctx, PANDA_BUDDY, Math.round(x), groundY - PANDA_BUDDY.length * 2 + hop, 2, scenePalette, { blink })
 }
 
 function drawCloud(ctx: Ctx, cx: number, cy: number, rx: number, ry: number): void {
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   for (let y = -ry; y <= ry; y += 2) {
     for (let x = -rx; x <= rx; x += 2) {
       const d = (x * x) / (rx * rx) + (y * y) / (ry * ry)
@@ -62,7 +60,7 @@ function drawCloud(ctx: Ctx, cx: number, cy: number, rx: number, ry: number): vo
 }
 
 function drawGround(ctx: Ctx, horizon: number, maxDensity = 0.4): void {
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   for (let y = horizon; y < H; y += 2) {
     const t = (y - horizon) / (H - horizon)
     const density = 0.07 + t * (maxDensity - 0.07)
@@ -73,7 +71,7 @@ function drawGround(ctx: Ctx, horizon: number, maxDensity = 0.4): void {
 }
 
 function drawBird(ctx: Ctx, x: number, y: number, flap: boolean): void {
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   const px = Math.round(x)
   const py = Math.round(y)
   if (flap) {
@@ -88,14 +86,14 @@ function drawBird(ctx: Ctx, x: number, y: number, flap: boolean): void {
 }
 
 function drawButterfly(ctx: Ctx, f: number, x: number, y: number): void {
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   const open = Math.floor(f / 2) % 2 === 0
   ctx.fillRect(Math.round(x) - (open ? 2 : 1), Math.round(y), open ? 2 : 1, 1)
   ctx.fillRect(Math.round(x) + 1, Math.round(y), open ? 2 : 1, 1)
 }
 
 function drawHills(ctx: Ctx, horizon: number, seed: number): void {
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   for (let x = 0; x < W; x += 2) {
     const h1 = Math.sin(x / 34 + seed) * 7 + Math.sin(x / 13 + seed * 2) * 3
     const top = horizon - 10 - h1
@@ -107,7 +105,7 @@ function drawHills(ctx: Ctx, horizon: number, seed: number): void {
 }
 
 function drawFlower(ctx: Ctx, x: number, y: number, f: number): void {
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   const sway = Math.floor(f / 8) % 2
   ctx.fillRect(x + sway, y - 4, 1, 1)
   ctx.fillRect(x - 1 + sway, y - 3, 3, 1)
@@ -122,60 +120,60 @@ function drawProp(ctx: Ctx, name: string, x: number, groundY: number, f: number)
   const g = groundY
   switch (name) {
     case 'plant': {
-      ctx.fillStyle = PAL.dark
+      ctx.fillStyle = scenePalette.dark
       ctx.fillRect(x - 2, g - 3, 5, 3)
-      ctx.fillStyle = INK
+      ctx.fillStyle = sceneColors.ink
       for (let i = -3; i <= 3; i++) if (hash(x + i, 1) < 0.7) ctx.fillRect(x + i, g - 6 - Math.abs(i) % 2, 1, 2)
       break
     }
     case 'hat':
-      ctx.fillStyle = PAL.dark
+      ctx.fillStyle = scenePalette.dark
       ctx.fillRect(x - 3, g - 2, 7, 2)
       ctx.fillRect(x - 1, g - 5, 3, 3)
       break
     case 'snail':
-      ctx.fillStyle = INK
+      ctx.fillStyle = sceneColors.ink
       ctx.fillRect(x, g - 4, 4, 4)
       ctx.fillRect(x + 1, g - 3, 2, 2)
-      ctx.fillStyle = PAL.dark
+      ctx.fillStyle = scenePalette.dark
       ctx.fillRect(x - 3, g - 2, 4, 2)
       ctx.fillRect(x - 4, g - 5, 1, 3)
       break
     case 'mug':
-      ctx.fillStyle = INK
+      ctx.fillStyle = sceneColors.ink
       ctx.fillRect(x - 2, g - 4, 4, 4)
       ctx.fillRect(x + 2, g - 3, 1, 2)
       if (f % 16 < 10) ctx.fillRect(x - 1 + (f % 4 < 2 ? 0 : 1), g - 7 - (f % 16) / 4, 1, 1)
       break
     case 'banner':
-      ctx.fillStyle = INK
+      ctx.fillStyle = sceneColors.ink
       ctx.fillRect(x, g - 12, 1, 12)
-      ctx.fillStyle = BODY
+      ctx.fillStyle = sceneColors.body
       ctx.fillRect(x + 1, g - 12, 5 + (Math.floor(f / 6) % 2), 3)
       break
     case 'lantern':
-      ctx.fillStyle = INK
+      ctx.fillStyle = sceneColors.ink
       ctx.fillRect(x, g - 9, 1, 9)
       ctx.fillRect(x - 2, g - 9, 5, 1)
-      ctx.fillStyle = Math.floor(f / 8) % 4 === 0 ? PAL.dark : BODY
+      ctx.fillStyle = Math.floor(f / 8) % 4 === 0 ? scenePalette.dark : sceneColors.body
       ctx.fillRect(x - 1, g - 8, 3, 3)
       break
     case 'books':
-      ctx.fillStyle = INK
+      ctx.fillStyle = sceneColors.ink
       ctx.fillRect(x - 3, g - 2, 7, 2)
-      ctx.fillStyle = PAL.dark
+      ctx.fillStyle = scenePalette.dark
       ctx.fillRect(x - 2, g - 4, 6, 2)
-      ctx.fillStyle = INK
+      ctx.fillStyle = sceneColors.ink
       ctx.fillRect(x - 3, g - 6, 5, 2)
       break
     case 'radio':
-      ctx.fillStyle = INK
+      ctx.fillStyle = sceneColors.ink
       ctx.fillRect(x - 3, g - 4, 7, 4)
       ctx.fillRect(x + 2, g - 8, 1, 4)
-      ctx.fillStyle = EYE
+      ctx.fillStyle = sceneColors.eye
       ctx.fillRect(x - 2, g - 3, 2, 2)
       if (f % 10 < 5) {
-        ctx.fillStyle = INK
+        ctx.fillStyle = sceneColors.ink
         ctx.fillRect(x + 5, g - 8 - (f % 10), 1, 1)
         ctx.fillRect(x + 6, g - 7 - (f % 10), 1, 2)
       }
@@ -203,7 +201,7 @@ function sceneMeadow(ctx: Ctx, f: number, blink: boolean): void {
   const horizon = 90
   drawHills(ctx, horizon, 5)
   drawGround(ctx, horizon)
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   for (let i = 0; i < 14; i++) {
     const gx = Math.round(hash(i, 3) * (W - 10)) + 5
     ctx.fillRect(gx, horizon - 2, 1, 2)
@@ -222,7 +220,7 @@ function sceneMeadow(ctx: Ctx, f: number, blink: boolean): void {
 }
 
 function sceneSurf(ctx: Ctx, f: number, blink: boolean): void {
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   drawCloud(ctx, 26, 16, 9, 8)
   const g = f % 90
   if (g < 60) drawBird(ctx, W - g * 2.4, 18 + Math.sin(g / 5) * 3, Math.floor(g / 3) % 2 === 0)
@@ -264,13 +262,13 @@ function sceneSurf(ctx: Ctx, f: number, blink: boolean): void {
   let surfY = H
   for (let x = mx - 4; x <= mx + 50; x += 4) surfY = Math.min(surfY, surface(x))
   const boardY = Math.round(surfY + 1 + Math.sin(f / 6) * 3.5)
-  ctx.fillStyle = BODY_LIGHT
+  ctx.fillStyle = sceneColors.bodyLight
   ctx.fillRect(Math.round(mx - 4), boardY, 54, 3)
   drawSitter(ctx, blink, mx, boardY - PANDA_BODY_ROWS * 2)
 }
 
 function sceneDisco(ctx: Ctx, f: number, blink: boolean): void {
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   const bx = 96
   const by = 26
   const R = 14
@@ -308,20 +306,20 @@ function sceneDisco(ctx: Ctx, f: number, blink: boolean): void {
   const bob = Math.floor(f / 3) % 2
   const sx = Math.round(W / 2 - 22)
   const sy = floor - PANDA.length * 2 - 8 + bob
-  drawPanda(ctx, PANDA, sx, sy, 2, PAL, { blink, step: bob as 0 | 1 })
+  drawPanda(ctx, PANDA, sx, sy, 2, scenePalette, { blink, step: bob as 0 | 1 })
   // headphones: a band across the crown + over-ear cups hugging each side
   // (positioned for the blob mascot — clear of the eyes at cols 5-6 / 16-17)
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   for (let c = 4; c <= 19; c++) ctx.fillRect(sx + c * 2, sy + 2, 2, 2)
   for (let r = 2; r <= 7; r++) {
     ctx.fillRect(sx + 2 * 2, sy + r * 2, 2, 2)
     ctx.fillRect(sx + 21 * 2, sy + r * 2, 2, 2)
   }
   for (let x = 58; x < 134; x += 2) ctx.fillRect(x, floor - 8, 1, 1)
-  ctx.fillStyle = EYE
+  ctx.fillStyle = sceneColors.eye
   ctx.fillRect(64, floor - 6, 12, 3)
   ctx.fillRect(116, floor - 6, 12, 3)
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   ctx.fillRect(69 + (f % 4 < 2 ? 1 : -1), floor - 5, 2, 1)
   ctx.fillRect(121 + (f % 4 < 2 ? -1 : 1), floor - 5, 2, 1)
   drawBuddy(ctx, f, blink, wander(f, 18, 44, 1.1), floor, 3)
@@ -329,7 +327,7 @@ function sceneDisco(ctx: Ctx, f: number, blink: boolean): void {
 }
 
 function sceneGarden(ctx: Ctx, f: number, blink: boolean): void {
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   for (let x = 58; x <= 150; x += 2) {
     ctx.fillRect(x, 10, 1, 1)
     ctx.fillRect(x, 56, 1, 1)
@@ -373,7 +371,7 @@ function sceneGarden(ctx: Ctx, f: number, blink: boolean): void {
   drawCloud(ctx, 42, 27, 4, 3)
   const horizon = 92
   drawGround(ctx, horizon, 0.26)
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   for (let x = 52; x < 104; x += 3) {
     ctx.fillRect(x, horizon + 4, 1, 1)
     ctx.fillRect(x + 1, horizon + 8, 1, 1)
@@ -397,7 +395,7 @@ function sceneGarden(ctx: Ctx, f: number, blink: boolean): void {
 }
 
 function sceneGlobe(ctx: Ctx, f: number, blink: boolean): void {
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   const cx = 96
   const cy = 128
   const R = 66
@@ -434,14 +432,14 @@ function sceneGlobe(ctx: Ctx, f: number, blink: boolean): void {
   const sx = cx - 22
   const sy = cy - R - PANDA_BODY_ROWS * 2 - 2
   drawSitter(ctx, false, sx, sy)
-  ctx.fillStyle = EYE
+  ctx.fillStyle = sceneColors.eye
   ctx.fillRect(sx + 5 * 2, sy + 4 * 2, 5 * 2, blink ? 2 : 4)
   ctx.fillRect(sx + 15 * 2, sy + 4 * 2, 5 * 2, blink ? 2 : 4)
   ctx.fillRect(sx + 10 * 2, sy + 4 * 2, 5 * 2, 1)
 }
 
 function sceneNight(ctx: Ctx, f: number, blink: boolean): void {
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   for (let i = 0; i < 56; i++) {
     if (hash(i, Math.floor(f / 6) + Math.floor(i / 7)) > 0.3) {
       ctx.fillRect(Math.round(hash(i, 11) * (W - 8)) + 4, Math.round(hash(i, 17) * 62) + 4, 1, 1)
@@ -462,7 +460,7 @@ function sceneNight(ctx: Ctx, f: number, blink: boolean): void {
   ctx.fillStyle = '#1e1e1e'
   ctx.fillRect(148, 18, 3, 3)
   ctx.fillRect(156, 26, 2, 2)
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   const t = f % 108
   if (t < 10) {
     for (let k = 0; k < 5; k++) ctx.fillRect(20 + t * 6 - k * 3, 14 + t * 2 - k, 1, 1)
@@ -480,11 +478,11 @@ function sceneNight(ctx: Ctx, f: number, blink: boolean): void {
     }
   }
   const fx = 120
-  ctx.fillStyle = BODY
+  ctx.fillStyle = sceneColors.body
   const lick = Math.floor(f / 2) % 3
   ctx.fillRect(fx, horizon - 6 - lick, 3, 4 + lick)
   ctx.fillRect(fx - 2, horizon - 3, 7, 3)
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   ctx.fillRect(fx - 4, horizon - 1, 11, 1)
   const sm = f % 14
   if (sm < 10) ctx.fillRect(fx + 1 + (sm % 4 < 2 ? 1 : -1), horizon - 10 - sm, 1, 1)
@@ -493,7 +491,7 @@ function sceneNight(ctx: Ctx, f: number, blink: boolean): void {
 }
 
 function sceneRain(ctx: Ctx, f: number, blink: boolean): void {
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   drawCloud(ctx, 40, 12, 30, 8)
   drawCloud(ctx, 110, 8, 34, 7)
   drawCloud(ctx, 168, 14, 22, 6)
@@ -523,13 +521,13 @@ function sceneRain(ctx: Ctx, f: number, blink: boolean): void {
     ctx.fillRect(ux + x, horizon - 40 + y, 1, 1)
     if (hash(x, 77) < 0.5) ctx.fillRect(ux + x, horizon - 39 + y, 1, 1)
   }
-  ctx.fillStyle = GRAY
+  ctx.fillStyle = sceneColors.gray
   ctx.fillRect(ux, horizon - 40, 1, 14)
   drawBuddy(ctx, f, blink, px - 8 + Math.sin(f / 5) * 3, horizon + 4, 3)
 }
 
 function sceneRooftop(ctx: Ctx, f: number, blink: boolean): void {
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   for (let i = 0; i < 30; i++) {
     if (hash(i, Math.floor(f / 6)) > 0.35) {
       ctx.fillRect(Math.round(hash(i, 11) * (W - 8)) + 4, Math.round(hash(i, 13) * 40) + 4, 1, 1)
@@ -561,9 +559,9 @@ function sceneRooftop(ctx: Ctx, f: number, blink: boolean): void {
   ctx.fillRect(160, 66, 1, 22)
   ctx.fillRect(156, 72, 9, 1)
   if (Math.floor(f / 6) % 2 === 0) {
-    ctx.fillStyle = BODY
+    ctx.fillStyle = sceneColors.body
     ctx.fillRect(159, 63, 3, 3)
-    ctx.fillStyle = INK
+    ctx.fillStyle = sceneColors.ink
   }
   drawSitter(ctx, blink, 66, 88 - PANDA_BODY_ROWS * 2 + (Math.floor(f / 8) % 2))
   drawBuddy(ctx, f, blink, 104, 88 + 2, 8)
@@ -573,7 +571,7 @@ function sceneRooftop(ctx: Ctx, f: number, blink: boolean): void {
 
 // burnout nap: the panda curls up under the moon to nudge you toward a break
 function sceneNap(ctx: Ctx, f: number, _blink: boolean): void {
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   for (let i = 0; i < 22; i++) {
     if (hash(i, Math.floor(f / 8)) > 0.45) {
       ctx.fillRect(Math.round(hash(i, 11) * (W - 8)) + 4, Math.round(hash(i, 17) * 50) + 4, 1, 1)
@@ -591,7 +589,7 @@ function sceneNap(ctx: Ctx, f: number, _blink: boolean): void {
   drawHills(ctx, horizon, 8)
   drawGround(ctx, horizon, 0.24)
   // rug
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   for (let x = 70; x < 126; x += 3) {
     ctx.fillRect(x, horizon + 2, 1, 1)
     ctx.fillRect(x + 1, horizon + 5, 1, 1)
@@ -599,36 +597,46 @@ function sceneNap(ctx: Ctx, f: number, _blink: boolean): void {
   // curled panda: body mound + ears + ringed tail wrapped around the front
   const cx = 96
   const breathe = Math.floor(f / 10) % 2
-  ctx.fillStyle = PAL.body
+  ctx.fillStyle = scenePalette.body
   for (let y = -8 - breathe; y <= 0; y++) {
     const half = Math.round(Math.sqrt(Math.max(0, 1 - (y / (8 + breathe)) ** 2)) * 15)
     ctx.fillRect(cx - half, horizon - 1 + y, half * 2, 1)
   }
-  ctx.fillStyle = PAL.dark
+  ctx.fillStyle = scenePalette.dark
   ctx.fillRect(cx - 12, horizon - 10 - breathe, 2, 2) // ear
   ctx.fillRect(cx - 8, horizon - 11 - breathe, 2, 2) // ear
   // tail rings wrapping the front
-  const rings = [PAL.dark, PAL.ink, PAL.dark, PAL.ink, PAL.dark]
+  const rings = [scenePalette.dark, scenePalette.ink, scenePalette.dark, scenePalette.ink, scenePalette.dark]
   rings.forEach((col, i) => {
     ctx.fillStyle = col
     ctx.fillRect(cx - 10 + i * 5, horizon - 3, 5, 3)
   })
   // closed eye + Zzz
-  ctx.fillStyle = PAL.eye
+  ctx.fillStyle = scenePalette.eye
   ctx.fillRect(cx - 9, horizon - 7 - breathe, 3, 1)
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   const z = Math.floor(f / 8) % 3
   ctx.fillRect(cx + 14 + z * 4, horizon - 16 - z * 4, 3, 1)
   ctx.fillRect(cx + 15 + z * 4, horizon - 15 - z * 4, 1, 1)
   ctx.fillRect(cx + 14 + z * 4, horizon - 14 - z * 4, 3, 1)
   // gentle nudge, terminal-dim, crisp bitmap pixels
-  drawPixelText(ctx, 'TAKE A BREAK · NOTHING DONE IN 90M', cx, H - 9, { color: GRAY, align: 'center' })
+  drawPixelText(ctx, 'TAKE A BREAK · NOTHING DONE IN 90M', cx, H - 9, { color: sceneColors.gray, align: 'center' })
 }
 
-const SCENES = [sceneMeadow, sceneSurf, sceneGarden, sceneDisco, sceneGlobe, sceneNight, sceneRain, sceneRooftop]
-const DISCO = 3
-// scenes with a walkable ground line — loot props furnish these
-const HORIZONS: Record<number, number> = { 0: 90, 2: 92, 3: 94, 5: 92, 6: 92, 7: 88 }
+// name-keyed registry: config references names, not fragile array indices.
+// horizon = walkable ground line for loot props (undefined = no ground scene).
+const SCENE_REGISTRY: Record<string, SceneDef> = {
+  meadow: { name: 'meadow', draw: sceneMeadow, horizon: 90 },
+  surf: { name: 'surf', draw: sceneSurf },
+  garden: { name: 'garden', draw: sceneGarden, horizon: 92 },
+  disco: { name: 'disco', draw: sceneDisco, horizon: 94 },
+  globe: { name: 'globe', draw: sceneGlobe },
+  night: { name: 'night', draw: sceneNight, horizon: 92 },
+  rain: { name: 'rain', draw: sceneRain, horizon: 92 },
+  rooftop: { name: 'rooftop', draw: sceneRooftop, horizon: 88 },
+  nap: { name: 'nap', draw: sceneNap }
+}
+export const SCENE_NAMES = Object.keys(SCENE_REGISTRY)
 const TRANS_FRAMES = 30 // ~2.5s: dissolve out → loading beat → dissolve in
 
 // chunky ordered pixel dissolve: replace an `amount` (0..1) fraction of 4px
@@ -655,12 +663,12 @@ function drawLoading(ctx: Ctx, f: number): void {
   const ch = PANDA.length * 2
   const sx = Math.round(W / 2 - cw / 2)
   const sy = Math.round(H / 2 - ch / 2) - 4 + bob
-  drawPanda(ctx, PANDA, sx, sy, 2, PAL, { blink: false, step: bob as 0 | 1 })
+  drawPanda(ctx, PANDA, sx, sy, 2, scenePalette, { blink: false, step: bob as 0 | 1 })
   const n = 1 + (Math.floor(f / 4) % 3) // · ·· ···
   const gap = 6
   let dx = Math.round(W / 2 - ((n - 1) * gap) / 2)
   const dotY = sy + ch + 6
-  ctx.fillStyle = INK
+  ctx.fillStyle = sceneColors.ink
   for (let i = 0; i < n; i++) {
     ctx.fillRect(dx - 1, dotY, 2, 2)
     dx += gap
@@ -677,8 +685,8 @@ function drawLoadingTransition(
   fromCtx: Ctx,
   toCtx: Ctx,
   loadCtx: Ctx,
-  fromScene: number,
-  toScene: number,
+  fromDraw: SceneFn,
+  toDraw: SceneFn,
   frozenF: number,
   liveF: number,
   blink: boolean,
@@ -694,13 +702,13 @@ function drawLoadingTransition(
   if (phase === 'out') {
     // outgoing scene frozen at its last frame, dissolving toward loading
     fromCtx.clearRect(0, 0, W, H)
-    SCENES[fromScene](fromCtx, frozenF, false)
+    fromDraw(fromCtx, frozenF, false)
     ctx.drawImage(fromBuf, 0, 0)
     ditherBlocks(ctx, loadBuf, mix)
   } else {
     // loading dissolving toward the live incoming scene
     toCtx.clearRect(0, 0, W, H)
-    SCENES[toScene](toCtx, liveF, blink)
+    toDraw(toCtx, liveF, blink)
     ctx.drawImage(loadBuf, 0, 0)
     ditherBlocks(ctx, toBuf, mix)
   }
@@ -733,13 +741,13 @@ function drawGraph(
   }
   for (let i = 0; i < 10; i++) {
     if (hash(i + 60, Math.floor(f / 5)) > 0.45) {
-      ctx.fillStyle = GRAY
+      ctx.fillStyle = sceneColors.gray
       ctx.fillRect(Math.round(hash(i + 60, 13) * (W - 8)) + 4, Math.round(hash(i + 60, 17) * (H - 30)) + 4, 1, 1)
     }
   }
   const shoot = f % 150
   if (shoot < 9) {
-    ctx.fillStyle = INK
+    ctx.fillStyle = sceneColors.ink
     for (let k = 0; k < 4; k++) ctx.fillRect(130 + shoot * 5 - k * 3, 10 + shoot * 2 - k, 1, 1)
   }
 
@@ -776,7 +784,7 @@ function drawGraph(
     const dy = s2.y - s1.y
     const len = Math.max(1, Math.sqrt(dx * dx + dy * dy))
     const steps = Math.max(4, Math.floor(len / 3))
-    ctx.fillStyle = isFocusEdge ? GRAY : focused ? FAR : CHART
+    ctx.fillStyle = isFocusEdge ? sceneColors.gray : focused ? FAR : CHART
     for (let s = 1; s < steps; s++) {
       if (s % 2 === 0) continue
       ctx.fillRect(Math.round(s1.x + (dx * s) / steps), Math.round(s1.y + (dy * s) / steps), 1, 1)
@@ -787,7 +795,7 @@ function drawGraph(
       for (let k = 0; k < 3; k++) {
         const t = head - k * 0.07
         if (t < 0 || t > 1) continue
-        ctx.fillStyle = k === 0 ? BODY : DARKPULSE
+        ctx.fillStyle = k === 0 ? sceneColors.body : DARKPULSE
         const px = Math.round(s1.x + dx * t)
         const py = Math.round(s1.y + dy * t)
         ctx.fillRect(px - (k === 0 ? 1 : 0), py - (k === 0 ? 1 : 0), k === 0 ? 2 : 1, k === 0 ? 2 : 1)
@@ -819,17 +827,17 @@ function drawGraph(
     if (isFocus) return // drawn last, on top
     if (!isHover && hash(i, Math.floor(f / 5)) < (s.ring === 3 && focused ? 0.3 : 0.06)) return
     if (s.ring === 3) {
-      ctx.fillStyle = focused ? CHART : s.node.links >= 2 ? INK : GRAY
+      ctx.fillStyle = focused ? CHART : s.node.links >= 2 ? sceneColors.ink : sceneColors.gray
       const sz = !focused && s.node.links >= 2 ? 2 : 1
       ctx.fillRect(s.x, s.y, sz, sz)
     } else if (s.ring === 2) {
-      ctx.fillStyle = GRAY
+      ctx.fillStyle = sceneColors.gray
       ctx.fillRect(s.x, s.y - 1, 1, 3)
       ctx.fillRect(s.x - 1, s.y, 3, 1)
     } else {
-      starburst(s.x, s.y, isHover ? BODY : INK, false)
+      starburst(s.x, s.y, isHover ? sceneColors.body : sceneColors.ink, false)
     }
-    if (isHover) starburst(s.x, s.y, BODY, true)
+    if (isHover) starburst(s.x, s.y, sceneColors.body, true)
     // neighbors wear their names — crisp bitmap pixels, placed outward
     // from the focus, then bumped down a line whenever boxes collide
     if ((s.ring === 1 && labeled < 6) || isHover) {
@@ -851,7 +859,7 @@ function drawGraph(
       }
       placedLabels.push({ x0, x1, y0: ly, y1: ly + 5 })
       drawPixelText(ctx, name, placeRight ? s.x + 5 : s.x - 5, ly, {
-        color: isHover ? BODY : GRAY,
+        color: isHover ? sceneColors.body : sceneColors.gray,
         align: placeRight ? 'left' : 'right'
       })
     }
@@ -868,9 +876,9 @@ function drawGraph(
         }
       }
     }
-    starburst(focus.x, focus.y, BODY, true)
+    starburst(focus.x, focus.y, sceneColors.body, true)
     const ra = f / 9
-    ctx.fillStyle = BODY
+    ctx.fillStyle = sceneColors.body
     for (let k = 0; k < 4; k++) {
       const t = ra + (k * Math.PI) / 2
       ctx.fillRect(Math.round(focus.x + Math.cos(t) * 7), Math.round(focus.y + Math.sin(t) * 7), 1, 1)
@@ -888,8 +896,8 @@ function drawGraph(
     const tw = measurePixelText(name)
     const lw = measurePixelText(links)
     const x0 = Math.round(W / 2 - (tw + lw) / 2)
-    drawPixelText(ctx, name, x0, H - 12, { color: INK })
-    drawPixelText(ctx, links, x0 + tw, H - 12, { color: GRAY })
+    drawPixelText(ctx, name, x0, H - 12, { color: sceneColors.ink })
+    drawPixelText(ctx, links, x0 + tw, H - 12, { color: sceneColors.gray })
     // dotted underline gives the nameplate a cartographic feel
     ctx.fillStyle = CHART
     for (let x = 0; x < tw + lw + 8; x += 2) ctx.fillRect(x0 - 4 + x, H - 4, 1, 1)
@@ -902,7 +910,9 @@ export function CoreScene({
   mood,
   loot,
   graph,
-  chart
+  chart,
+  scenes,
+  maxWidth = 560
 }: {
   usagePercent: number
   busy: boolean
@@ -910,6 +920,8 @@ export function CoreScene({
   loot: string[]
   graph: LinkGraph
   chart: boolean
+  scenes?: SceneConfig
+  maxWidth?: number
 }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const busyRef = useRef(busy)
@@ -924,6 +936,9 @@ export function CoreScene({
   graphRef.current = graph
   const chartRef = useRef(chart)
   chartRef.current = chart
+  const scn = resolveScenes(scenes, SCENE_NAMES, ROTATION_DEFAULT, FPS)
+  const scnRef = useRef(scn)
+  scnRef.current = scn
 
   // constellation reveal state — driven by Second Brain hover events and by
   // the pointer being over the canvas itself (so you can travel to a star)
@@ -997,15 +1012,17 @@ export function CoreScene({
       canvas.style.cursor = dissolve > 0.9 && hoverStarRef.current >= 0 ? 'pointer' : 'default'
 
       // --- render the active scene into its offscreen (12fps stepping) ---
-      const slot = Math.floor(frame / SCENE_FRAMES)
-      const sceneIdx = busyRef.current ? DISCO : slot % SCENES.length
+      const sceneFrames = scnRef.current.intervalFrames
+      const rot = scnRef.current.rotation
+      const slot = Math.floor(frame / sceneFrames)
+      const entry = busyRef.current ? SCENE_REGISTRY[scnRef.current.busy] : SCENE_REGISTRY[rot[slot % rot.length]]
       const napping = !busyRef.current && moodRef.current === 'napping'
-      const inScene = tf - slot * SCENE_FRAMES
+      const inScene = tf - slot * sceneFrames
       if (dissolve < 1) {
         if (!napping && inScene < TRANS_FRAMES && slot > 0 && !busyRef.current) {
-          const prev = (slot - 1) % SCENES.length
+          const prevEntry = SCENE_REGISTRY[rot[(slot - 1) % rot.length]]
           const blinkEvery = usageRef.current > 80 ? 24 : 48
-          const frozenF = slot * SCENE_FRAMES - 1 // last frame of the outgoing scene
+          const frozenF = slot * sceneFrames - 1 // last frame of the outgoing scene
           drawLoadingTransition(
             sctx,
             bufFrom,
@@ -1014,8 +1031,8 @@ export function CoreScene({
             cFrom,
             cTo,
             cLoad,
-            prev,
-            sceneIdx,
+            prevEntry.draw,
+            entry.draw,
             frozenF,
             frame,
             frame % blinkEvery >= blinkEvery - 6,
@@ -1026,11 +1043,10 @@ export function CoreScene({
           const blinkEvery = usageRef.current > 80 ? 24 : 48
           sctx.clearRect(0, 0, W, H)
           if (napping) {
-            sceneNap(sctx, frame, false)
+            SCENE_REGISTRY[scnRef.current.nap].draw(sctx, frame, false)
           } else {
-            SCENES[sceneIdx](sctx, frame, frame % blinkEvery >= blinkEvery - 6)
-            const horizon = HORIZONS[sceneIdx]
-            if (horizon !== undefined) drawLoot(sctx, lootRef.current, horizon, frame)
+            entry.draw(sctx, frame, frame % blinkEvery >= blinkEvery - 6)
+            if (entry.horizon !== undefined) drawLoot(sctx, lootRef.current, entry.horizon, frame)
           }
           lastFrame = frame
         }
@@ -1114,7 +1130,7 @@ export function CoreScene({
             focusUntil.current = performance.now() + 2500
           }
         }}
-        style={{ width: '100%', maxWidth: 560, imageRendering: 'pixelated', aspectRatio: '16/9' }}
+        style={{ width: '100%', maxWidth, imageRendering: 'pixelated', aspectRatio: '16/9' }}
       />
     </div>
   )

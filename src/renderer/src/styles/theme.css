@@ -24,18 +24,9 @@
   --danger: #ff6e4e;
   --font-pixel: 'Press Start 2P', monospace;
   --font-mono: 'Departure Mono', 'SF Mono', Menlo, monospace;
-}
-
-/* paper theme: the original Claude FM cream, switchable in settings */
-body[data-theme='paper'] {
-  --bg: #f4f2e9;
-  --panel: #f4f2e9;
-  --line: #17160f;
-  --line-soft: #dcd9ca;
-  --ink: #17160f;
-  --ink-dim: #8d8a7a;
-  --accent: #17160f;
-  --accent-dim: #8d8a7a;
+  --pad-x: 10px;
+  --pad-y: 8px;
+  --gap: 5px;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -59,10 +50,10 @@ body {
 .panel {
   background: var(--panel);
   border: 1px solid var(--line-soft);
-  padding: 8px 10px;
+  padding: var(--pad-y) var(--pad-x);
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: var(--gap);
   min-height: 0;
 }
 .panel-title {
@@ -141,3 +132,21 @@ button:disabled { color: var(--ink-dim); cursor: default; }
 
 /* notch island stays dark — it blends with the hardware notch */
 body.notch { background: transparent; color: #f4f2e9; }
+
+/* column resize handle: invisible strip on the column's inner edge, drag to
+   resize left/right column widths (see App's startResize) */
+.resize-handle {
+  background: transparent;
+  transition: background 120ms;
+}
+.resize-handle:hover {
+  background: linear-gradient(to right, transparent 3px, var(--clay) 3px, var(--clay) 4px, transparent 4px);
+}
+
+.panel-vresize {
+  background: transparent;
+  transition: background 120ms;
+}
+.panel-vresize:hover {
+  background: linear-gradient(to bottom, transparent 3px, var(--clay) 3px, var(--clay) 4px, transparent 4px);
+}
