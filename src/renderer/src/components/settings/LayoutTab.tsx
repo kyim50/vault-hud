@@ -2,6 +2,8 @@ import type { HudSnapshot } from '@shared/types'
 import { resolveLayout, DEFAULT_ZONES } from '../../lib/resolveLayout'
 import { resolveGeometry, GEOMETRY_BOUNDS } from '../../lib/resolveGeometry'
 import { resolveModule } from '../../modules/resolve'
+import { resolvePanelSize, DEFAULT_GROW } from '../../lib/resolvePanelSize'
+import { resolveNotch } from '@shared/resolveNotch'
 import { Section, Row, Stepper, Toggle, Picker } from './primitives'
 
 // every module appears in the canonical default layout — use it as the id list
@@ -45,6 +47,13 @@ export function LayoutTab({ snap }: { snap: HudSnapshot }) {
     const [cmin, cmax] = GEOMETRY_BOUNDS.coreMax
     window.vault.updateConfig({ ui: { geometry: { ...snap.ui.geometry, coreMax: Math.max(cmin, Math.min(cmax, px)) } } })
   }
+  const setGrow = (id: string, grow: boolean): void =>
+    window.vault.updateConfig({ ui: { modules: { ...snap.ui.modules, [id]: { ...snap.ui.modules?.[id], grow, ...(grow ? { height: undefined } : {}) } } } })
+  const setHeight = (id: string, h: number | null): void =>
+    window.vault.updateConfig({ ui: { modules: { ...snap.ui.modules, [id]: { ...snap.ui.modules?.[id], grow: false, height: h == null ? undefined : Math.max(80, Math.min(900, h)) } } } })
+  const notch = resolveNotch(snap.ui.notch)
+  const setNotch = (patch: Partial<{ enabled: boolean; width: number; expandedHeight: number }>): void =>
+    window.vault.updateConfig({ ui: { notch: { ...snap.ui.notch, ...patch } } })
 
   const zoneNames = zones.map((_, i) => String(i))
   return (
@@ -58,12 +67,27 @@ export function LayoutTab({ snap }: { snap: HudSnapshot }) {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {z.length === 0 && <span className="dim" style={{ fontSize: 10 }}>empty</span>}
-              {z.map((id) => (
-                <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}>
-                  <span style={{ color: 'var(--ink)' }}>{id}</span>
-                  <Picker value={String(i)} options={zoneNames} onPick={(t) => moveModule(id, Number(t))} />
-                </span>
-              ))}
+              {z.map((id) => {
+                const size = resolvePanelSize(snap.ui.modules?.[id], DEFAULT_GROW.has(id))
+                return (
+                  <div key={id} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                    <span style={{ minWidth: 58, color: 'var(--ink)' }}>{id}</span>
+                    <Picker value={String(i)} options={zoneNames} onPick={(t) => moveModule(id, Number(t))} />
+                    <Toggle on={size.grow} label="grow" onClick={() => setGrow(id, !size.grow)} />
+                    {!size.grow && (
+                      <Stepper
+                        value={size.height ?? 'auto'}
+                        suffix={size.height != null ? 'px' : ''}
+                        onDec={() => setHeight(id, (size.height ?? 200) - 20)}
+                        onInc={() => setHeight(id, (size.height ?? 200) + 20)}
+                      />
+                    )}
+                    {size.height != null && (
+                      <button onClick={() => setHeight(id, null)} style={{ fontSize: 10 }}>auto</button>
+                    )}
+                  </div>
+                )
+              })}
             </div>
             <Row label="WIDTH">
               {i === geo.flexZone ? (
@@ -89,6 +113,21 @@ export function LayoutTab({ snap }: { snap: HudSnapshot }) {
         <Row label="CORE">
           <Stepper value={geo.coreMax} suffix="px" onDec={() => setCoreMax(geo.coreMax - 20)} onInc={() => setCoreMax(geo.coreMax + 20)} />
           <button onClick={() => window.vault.updateConfig({ ui: { geometry: {} } })} style={{ fontSize: 10 }}>reset all sizes</button>
+        </Row>
+      </Section>
+      <Section title="NOTCH">
+        <Row label="NOTCH">
+          <Toggle
+            on={notch.enabled}
+            label={notch.enabled ? 'on' : 'off — restart to apply'}
+            onClick={() => setNotch({ enabled: !notch.enabled })}
+          />
+        </Row>
+        <Row label="WIDTH">
+          <Stepper value={notch.width} suffix="px" onDec={() => setNotch({ width: notch.width - 20 })} onInc={() => setNotch({ width: notch.width + 20 })} />
+        </Row>
+        <Row label="EXPAND">
+          <Stepper value={notch.expandedHeight} suffix="px" onDec={() => setNotch({ expandedHeight: notch.expandedHeight - 20 })} onInc={() => setNotch({ expandedHeight: notch.expandedHeight + 20 })} />
         </Row>
       </Section>
     </>
