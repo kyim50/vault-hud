@@ -73,6 +73,10 @@ Everything visual is customizable live from the **⚙ settings** panel — no
 config-file spelunking required. Your whole look is called a **rice**, and it's
 one shareable JSON.
 
+<p align="center">
+  <img src="docs/assets/customize.png" alt="the vault settings panel — theme, density, font and frame controls" width="880" />
+</p>
+
 - **Appearance** — pick a theme (`terminal` / `paper` built-ins, plus any user
   theme), tune density (compact / cozy / airy), swap the mono font stack, and
   toggle the frame parade (critters patrolling the HUD border). Drop your own
@@ -100,6 +104,10 @@ one shareable JSON.
   settings, earned loot, saved pixel art and theme files all stay put — it just
   clears the active rice and unassigns custom sprites so the default HUD
   returns. Handy after experimenting or trying on someone else's rice.
+
+<p align="center">
+  <img src="docs/assets/reset.png" alt="the Share tab — export/import rice, and a non-destructive Reset appearance" width="880" />
+</p>
 
 ## Requirements
 
