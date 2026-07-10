@@ -67,6 +67,40 @@
 - **Tray** — `◉ N%` of your token window (or CPU), always visible, with a
   quick-run menu.
 
+## Make it yours — the ⚙ settings panel & rice
+
+Everything visual is customizable live from the **⚙ settings** panel — no
+config-file spelunking required. Your whole look is called a **rice**, and it's
+one shareable JSON.
+
+- **Appearance** — pick a theme (`terminal` / `paper` built-ins, plus any user
+  theme), tune density (compact / cozy / airy), swap the mono font stack, and
+  toggle the frame parade (critters patrolling the HUD border). Drop your own
+  theme files in `~/.vault-hud/themes/*.json` — starter `midnight.json` and
+  `amber.json` are scaffolded on first run — and they hot-load the moment you
+  save. Editable themes can be recolored in-app.
+- **Layout** — the HUD is a grid of zones you build yourself: add/remove zones,
+  drag modules between them, set each zone's width (or mark one as the flexible
+  fill), grow panels to fill or pin them to a fixed height, disable panels you
+  don't want, and resize the Core canvas.
+- **Scenes** — choose which of the eight Core scenes rotate and in what order,
+  set the seconds-per-scene, and pick the "busy" scene (plays while a command
+  runs) and the "nap" scene (after 90min idle).
+- **Sprites** — the Sprite Studio: drop any image and it's crunched into a flat
+  8-bit sprite in its own palette, backdrop stripped. Assign a sprite as the
+  **mascot** (becomes the main character across every scene + the vaultfetch
+  logo), a **frame** patroller, or the big **totem** display.
+- **Notch** — turn the notch island on/off and tune its width and expanded
+  height.
+- **Share** — export your whole rice (theme + layout + scenes + sizes + notch +
+  audio + sprites) to the clipboard or a `.rice.json` file, or paste someone
+  else's and apply it live. Your HUD becomes their setup in one click.
+- **Reset appearance** — one button (Share tab) drops every customization back
+  to the stock look. It's non-destructive: your notes, repos, provider
+  settings, earned loot, saved pixel art and theme files all stay put — it just
+  clears the active rice and unassigns custom sprites so the default HUD
+  returns. Handy after experimenting or trying on someone else's rice.
+
 ## Requirements
 
 - macOS (Apple Silicon or Intel — the app ships universal)
@@ -122,7 +156,12 @@ npm test                     # vitest
 | `ai.windowTokenLimit` | tokens ≙ 100% — tune to your plan |
 | `ai.ollamaModel` | model for `ollama run` (default `llama3.2`) |
 | `primaryDirective` | the big counter: `label`, `target`, `unit`, `source` (`commitsThisWeek` or `manual`) |
-| `loot` | accessory props the panda has earned (managed by the app) |
+| `pet` | companion `name` + earned `xp` (name also editable in ⚙) |
+| `loot` | accessory props the companion has earned (managed by the app) |
+| `ui` | your **rice** — theme, layout, scenes, geometry, notch, audio, modules, inline themes. Prefer editing this from the ⚙ settings panel; **Reset appearance** (Share tab) restores it to stock |
+
+Custom sprites live in `~/.vault-hud/sprites.json` and user themes in
+`~/.vault-hud/themes/*.json` — both survive a rice reset.
 
 Legacy `claude.*` keys migrate into `ai.*` automatically. Restart the app
 after editing. A corrupted config is never overwritten — vault boots with

@@ -55,6 +55,19 @@ export async function saveSprite(list: CustomSprite[], sprite: CustomSprite): Pr
   return next
 }
 
+// Reset appearance: keep every saved sprite in the library but unassign it, so
+// the stock mascot/frame/totem return without destroying the user's pixel art.
+export async function unassignSprites(list: CustomSprite[]): Promise<CustomSprite[]> {
+  const next = list.map((s) => (s.use === 'none' ? s : { ...s, use: 'none' as const }))
+  try {
+    await fs.mkdir(CONFIG_DIR, { recursive: true })
+    await fs.writeFile(SPRITES_PATH, JSON.stringify(next))
+  } catch {
+    /* fail soft */
+  }
+  return next
+}
+
 export async function deleteSprite(list: CustomSprite[], name: string): Promise<CustomSprite[]> {
   const next = list.filter((s) => s.name !== name)
   try {

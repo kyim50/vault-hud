@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectVaultPath, buildDefaultConfig, mergeConfig } from '../src/main/config'
+import { detectVaultPath, buildDefaultConfig, buildDefaultUi, mergeConfig } from '../src/main/config'
 
 describe('detectVaultPath', () => {
   it('returns the open vault path from obsidian.json', () => {
@@ -42,6 +42,29 @@ describe('buildDefaultConfig', () => {
   it('uses empty vaultPath when null', () => {
     const cfg = buildDefaultConfig({ home: '/u', vaultPath: null, repoDirs: [] })
     expect(cfg.vaultPath).toBe('')
+  })
+})
+
+describe('buildDefaultUi', () => {
+  it('is the stock look with no custom rice slices', () => {
+    const ui = buildDefaultUi()
+    expect(ui.theme).toBe('terminal')
+    expect(ui.parade).toBe(true)
+    expect(ui.audio).toEqual({ mode: 'off', volume: 40 })
+    // reset must drop custom rice, not carry it over
+    expect(ui.layout).toBeUndefined()
+    expect(ui.scenes).toBeUndefined()
+    expect(ui.geometry).toBeUndefined()
+    expect(ui.notch).toBeUndefined()
+    expect(ui.modules).toBeUndefined()
+    expect(ui.themes).toBeUndefined()
+  })
+  it('matches the ui the default config ships with', () => {
+    const cfg = buildDefaultConfig({ home: '/u', vaultPath: null, repoDirs: [] })
+    expect(cfg.ui).toEqual(buildDefaultUi())
+  })
+  it('returns a fresh object each call (no shared mutable state)', () => {
+    expect(buildDefaultUi()).not.toBe(buildDefaultUi())
   })
 })
 

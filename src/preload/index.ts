@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('vault', {
   openDoc: (relPath: string) => ipcRenderer.send(IPC.openDoc, relPath),
   resizeNotch: (expanded: boolean) => ipcRenderer.send(IPC.notchResize, expanded),
   updateConfig: (patch: unknown) => ipcRenderer.send(IPC.updateConfig, patch),
+  resetRice: () => ipcRenderer.send(IPC.resetRice),
   saveSprite: (sprite: CustomSprite) => ipcRenderer.send(IPC.saveSprite, sprite),
   deleteSprite: (name: string) => ipcRenderer.send(IPC.deleteSprite, name),
   writeTheme: (name: string, def: ThemeDef) => ipcRenderer.send(IPC.writeTheme, { name, def }),

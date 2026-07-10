@@ -2,8 +2,8 @@ import { app, BrowserWindow, ipcMain, shell, Tray } from 'electron'
 import { join, resolve, sep } from 'node:path'
 import { IPC } from '@shared/ipc'
 import type { CustomSprite, Directive, RepoConfig, ThemeDef, VaultHudConfig } from '@shared/types'
-import { loadOrCreateConfig, saveConfig, CONFIG_PATH } from './config'
-import { loadSprites, saveSprite as persistSprite, deleteSprite as removeSprite } from './sprites'
+import { loadOrCreateConfig, saveConfig, buildDefaultUi, CONFIG_PATH } from './config'
+import { loadSprites, saveSprite as persistSprite, deleteSprite as removeSprite, unassignSprites } from './sprites'
 import { writeTheme } from './collectors/themes'
 import { HudState } from './state'
 import { appendCapture, setDirectiveDone } from './collectors/vault'
@@ -92,6 +92,23 @@ app.whenReady().then(async () => {
       }
     } catch (e) {
       console.error('vault-hud: updateConfig failed', e)
+    }
+  })
+  // Reset appearance: restore the stock rice. Replaces the whole ui slice
+  // (dropping any custom theme/layout/scenes/geometry/notch/audio) and unassigns
+  // custom sprites so the default look returns — but keeps user data (repos,
+  // vault, ai, pet) and the saved sprite art + theme files untouched.
+  ipcMain.on(IPC.resetRice, async () => {
+    try {
+      config.ui = buildDefaultUi()
+      await saveConfig(config)
+      state.snapshot.sprites = await unassignSprites(state.snapshot.sprites)
+      await state.refreshAll()
+      if (notchWin && !notchWin.isDestroyed()) {
+        applyNotchBounds(notchWin, resolveNotch(config.ui.notch))
+      }
+    } catch (e) {
+      console.error('vault-hud: resetRice failed', e)
     }
   })
   ipcMain.on(IPC.saveSprite, async (_e, sprite: CustomSprite) => {

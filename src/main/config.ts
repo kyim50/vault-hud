@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, basename } from 'node:path'
-import type { VaultHudConfig } from '@shared/types'
+import type { UiConfig, VaultHudConfig } from '@shared/types'
 
 export function detectVaultPath(obsidianJsonContent: string): string | null {
   try {
@@ -14,6 +14,12 @@ export function detectVaultPath(obsidianJsonContent: string): string | null {
   } catch {
     return null
   }
+}
+
+// The stock look ("rice") — used both when scaffolding a fresh config and when
+// the user hits Reset appearance to fall back from a custom rice.
+export function buildDefaultUi(): UiConfig {
+  return { theme: 'terminal', parade: true, audio: { mode: 'off', volume: 40 } }
 }
 
 export function buildDefaultConfig(opts: {
@@ -35,7 +41,7 @@ export function buildDefaultConfig(opts: {
     },
     pet: { name: 'pip', xp: 0 },
     loot: [],
-    ui: { theme: 'terminal', parade: true, audio: { mode: 'off', volume: 40 } }
+    ui: buildDefaultUi()
   }
 }
 

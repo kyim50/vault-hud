@@ -6,6 +6,7 @@ import { Section } from './primitives'
 export function ShareTab({ snap }: { snap: HudSnapshot }) {
   const [text, setText] = useState('')
   const [msg, setMsg] = useState('')
+  const [confirmReset, setConfirmReset] = useState(false)
 
   const exportRice = (): string => JSON.stringify(buildRice(snap), null, 2)
 
@@ -37,6 +38,11 @@ export function ShareTab({ snap }: { snap: HudSnapshot }) {
     for (const s of b.sprites ?? []) window.vault.saveSprite(s)
     setMsg('rice applied — your HUD now matches it')
   }
+  const resetRice = (): void => {
+    window.vault.resetRice()
+    setConfirmReset(false)
+    setMsg('reset to the stock look — your notes, repos and saved sprites are untouched')
+  }
 
   return (
     <>
@@ -56,6 +62,18 @@ export function ShareTab({ snap }: { snap: HudSnapshot }) {
           style={{ width: '100%', height: 90, background: 'var(--bg)', color: 'var(--ink)', border: '1px solid var(--line-soft)', fontFamily: 'var(--font-mono)', fontSize: 10, padding: 6, resize: 'vertical' }}
         />
         <button onClick={importRice} disabled={!text.trim()} style={{ fontSize: 10 }}>· apply rice</button>
+      </Section>
+      <Section title="RESET">
+        <div className="dim" style={{ fontSize: 10 }}>drop every customization — theme, layout, scenes, sizes, notch, audio, and custom sprites — back to the stock look. your notes, repos, provider settings and saved pixel art stay put.</div>
+        {confirmReset ? (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <span className="clay" style={{ fontSize: 10 }}>reset the whole look?</span>
+            <button onClick={resetRice} style={{ fontSize: 10 }}>· yes, reset</button>
+            <button onClick={() => setConfirmReset(false)} style={{ fontSize: 10 }}>· cancel</button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmReset(true)} style={{ fontSize: 10 }}>· reset appearance</button>
+        )}
       </Section>
       {msg && <div className="clay" style={{ fontSize: 10, marginTop: 6 }}>{msg}</div>}
     </>

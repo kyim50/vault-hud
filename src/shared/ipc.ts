@@ -8,6 +8,7 @@ export const IPC = {
   openDoc: 'doc:open',
   notchResize: 'notch:resize',
   updateConfig: 'config:update',
+  resetRice: 'rice:reset',
   saveSprite: 'sprite:save',
   deleteSprite: 'sprite:delete',
   writeTheme: 'theme:write',
@@ -22,6 +23,7 @@ export interface VaultApi {
   openDoc(relPath: string): void
   resizeNotch(expanded: boolean): void
   updateConfig(patch: { ui?: Partial<UiConfig>; ai?: Partial<AiConfig>; petName?: string; repos?: RepoConfig[] }): void
+  resetRice(): void
   saveSprite(sprite: CustomSprite): void
   deleteSprite(name: string): void
   writeTheme(name: string, def: ThemeDef): void
